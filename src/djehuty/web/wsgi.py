@@ -404,6 +404,12 @@ class ApiServer:
             ## ----------------------------------------------------------------
             R("/v3/receive-from-ssi",                                            self.api_v3_receive_from_ssi),
             R("/v3/redirect-from-ssi/<container_uuid>/<token>",                  self.api_v3_redirect_from_ssi),
+
+
+            ## ----------------------------------------------------------------
+            ## INTERNATIONAL IMAGE INTEROPERABILITY FRAMEWORK
+            ## ----------------------------------------------------------------
+            R("/iiif/v3/<file_uuid>/<region>/<size>/<rotation>/<quality>.<image_format>", self.iiif_v3_image),
         ])
 
         ## Static resources and HTML templates.
@@ -9057,3 +9063,36 @@ class ApiServer:
                 parts = split_author_name(author['full_name'])
                 author['first_name'] = parts[0]
                 author['last_name' ] = parts[1]
+
+    ## ------------------------------------------------------------------------
+    ## IIIF
+    ## ------------------------------------------------------------------------
+
+    def iiif_v3_image (self, request, file_uuid, region, size, rotation, quality, image_format):
+        """Implements /iiif/v3/<uuid>/<region>/<size>/<rotation>/<quality>.<format>."""
+
+        if not validator.is_valid_uuid (file_uuid):
+            return self.error_400 (request, "Invalid file UUID.", "InvalidFileUUID")
+
+        validation_errors = []
+        parameters = {
+            "region": region,
+            "size": size,
+            "rotation": rotation,
+            "quality": quality,
+            "image_format": image_format
+        }
+        supported_qualities = ["color", "gray", "bitonal", "default"]
+        supported_formats   = ["jpg", "tif", "png", "gif", "jp2", "pdf", "webp"]
+        quality = validator.options_value (parameters, "quality", supported_qualities,
+                                           required=True, error_list=validation_errors)
+
+        image_format = validator.options_value (parameters, "image_format", supported_formats,
+                                                required=True, error_list=validation_errors)
+
+        if validation_errors:
+            return self.error_400_list (request, validation_errors)
+
+        metadata = self.db.dataset_files (file_uuid = file_uuid, is_image = True)
+
+        return self.error_500 ()
