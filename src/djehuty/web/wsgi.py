@@ -50,6 +50,12 @@ try:
 except (ImportError, ModuleNotFoundError):
     pass
 
+## Similarly, error handling for loading pyvips is done in 'ui'.
+try:
+    import pyvips
+except (OSError, ImportError, ModuleNotFoundError):
+    pass
+
 def R (uri_path, endpoint):  # pylint: disable=invalid-name
     """
     Short-hand for defining a route between a URI and its
@@ -83,6 +89,7 @@ class ApiServer:
         self.show_science_categories = True
         self.show_latest_datasets = True
         self.disable_2fa      = False
+        self.enable_iiif      = True
         self.disable_collaboration = False
         self.automatic_login_email = None
 
