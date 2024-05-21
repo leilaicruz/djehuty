@@ -706,6 +706,12 @@ def read_configuration_file (server, config_file, logger, config_files, config=N
         elif server.db.thumbnail_storage is None:
             server.db.thumbnail_storage = f"{server.db.storage}/thumbnails"
 
+        iiif_cache = xml_root.find ("iiif-cache-root")
+        if iiif_cache is not None:
+            server.db.iiif_cache_storage = iiif_cache.text
+        elif server.db.iiif_cache_storage is None:
+            server.db.iiif_cache_storage = f"{server.db.storage}/iiif"
+
         production_mode = xml_root.find ("production")
         if production_mode is not None:
             server.in_production = bool(int(production_mode.text))
@@ -1047,6 +1053,12 @@ def main (config_file=None, run_internal_server=True, initialize=True,
 
         if not server.add_static_root ("/thumbnails", server.db.thumbnail_storage):
             logger.error ("Failed to setup route for thumbnails.")
+
+        if server.db.iiif_cache_storage is not None and not inside_reload:
+            try:
+                os.makedirs (server.db.iiif_cache_storage, mode=0o700, exist_ok=True)
+            except PermissionError:
+                logger.error ("Cannot create %s directory.", server.db.iiif_cache_storage)
 
         server.db.setup_sparql_endpoint ()
         server.db.disable_collaboration = server.disable_collaboration

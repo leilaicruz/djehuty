@@ -417,6 +417,7 @@ class ApiServer:
             ## INTERNATIONAL IMAGE INTEROPERABILITY FRAMEWORK
             ## ----------------------------------------------------------------
             R("/iiif/v3/<file_uuid>/<region>/<size>/<rotation>/<quality>.<image_format>", self.iiif_v3_image),
+            R("/iiif/v3/<file_uuid>/info.json",                                  self.iiif_v3_image_context),
         ])
 
         ## Static resources and HTML templates.
@@ -9075,8 +9076,50 @@ class ApiServer:
     ## IIIF
     ## ------------------------------------------------------------------------
 
+    def iiif_v3_image_context (self, request, file_uuid):
+        """Implements /iiif/v3/<uuid>/info.json."""
+
+        if not self.enable_iiif:
+            return self.error_404 (request)
+
+        if not validator.is_valid_uuid (file_uuid):
+            return self.error_400 (request, "Invalid file UUID.", "InvalidFileUUID")
+
+        metadata = self.db.dataset_files (file_uuid = file_uuid)
+        if not metadata:
+            return self.error_404 (request)
+
+        try:
+            metadata = metadata[0]
+            input_filename = self.__filesystem_location (metadata)
+            image  = pyvips.Image.new_from_file (input_filename)
+            output = {
+                "@context":  "http://iiif.io/api/image/3/context.json",
+                "id":        f"{self.base_url}/iiif/v3/{file_uuid}",
+                "type":      "ImageService3",
+                "protocol":  "http://iiif.io/api/image",
+                "level":     "level0",
+                "width":     image.width,
+                "height":    image.height,
+                "maxWidth":  image.width,                # Optional
+                "maxHeight": image.height,               # Optional
+                "maxArea":   image.width * image.height, # Optional
+                "sizes": [{ "width": 1024, "height": 1024 }]
+            }
+            del image
+            return self.response (json.dumps (output))
+        except IndexError:
+            self.log.error ("Unable to read metadata.")
+        except (KeyError, FileNotFoundError, UnidentifiedImageError) as error:
+            self.log.error ("Unable to open image file %s", file_uuid)
+
+        return self.error_500 ()
+
     def iiif_v3_image (self, request, file_uuid, region, size, rotation, quality, image_format):
         """Implements /iiif/v3/<uuid>/<region>/<size>/<rotation>/<quality>.<format>."""
+
+        if not self.enable_iiif:
+            return self.error_404 (request)
 
         if not validator.is_valid_uuid (file_uuid):
             return self.error_400 (request, "Invalid file UUID.", "InvalidFileUUID")
@@ -9097,9 +9140,79 @@ class ApiServer:
         image_format = validator.options_value (parameters, "image_format", supported_formats,
                                                 required=True, error_list=validation_errors)
 
+        metadata = self.db.dataset_files (file_uuid = file_uuid)
+        if metadata is None:
+            return self.error_404 (request)
+
+        metadata = metadata[0]
+        input_filename = self.__filesystem_location (metadata)
+        original  = pyvips.Image.new_from_file (input_filename)
+        #original  = Image.open (metadata["filename"])
+        #extension = original.format.lower()
+
+        # Region
+        output_region = { "x": 0, "y": 0, "w": original.width, "h": original.height }
+        if region == "square":
+            shortest = min (original.width, original.height)
+            output_region["w"] = shortest
+            output_region["h"] = shortest
+
+        elif region.startswith("pct:"):
+            # To-do: implement percentage-wise translation.
+            validation_errors.append ({
+                "field_name": "region",
+                "message": "Percentage-wise regions are not implemented."
+            })
+
+        # Attempt to parse the x,y,w,h format
+        if validator.index_exists (region, 255):
+            validation_errors.append ({
+                "field_name": "region",
+                "message": "The region is too long"
+            })
+        elif region != "full" and region != "square":
+            deconstructed = region.split (",")
+            if len(deconstructed) != 4:
+                validation_errors.append ({
+                    "field_name": "region",
+                    "message": "The region format should be 'x,y,w,h'."
+                })
+            else:
+                output_region = { "x": deconstructed[0], "y": deconstructed[1],
+                                  "w": deconstructed[2], "h": deconstructed[3] }
+
+        # Size
+        output_size = { "w": original.width, "h": original.height }
+        mirror      = (isinstance (rotation, str) and rotation[0] == "!")
+        rotation    = int(rotation) if not mirror else int(rotation[1:])
+        if rotation < 0 or rotation > 360:
+            validation_errors.append ({
+                "field_name": "rotation",
+                "message": "Rotation must be a value between 0 and 360."
+            })
+
+        # ...
         if validation_errors:
             return self.error_400_list (request, validation_errors)
 
-        metadata = self.db.dataset_files (file_uuid = file_uuid, is_image = True)
+        # Transform the input image to the output image
+        # ---------------------------------------------------------------------
+        output = pyvips.Image.new_temp_file(format=f".{image_format}")
+        original.write(output)
+
+        output = output.crop (output_region["x"], output_region["y"],
+                              output_region["w"], output_region["h"])
+
+        if rotation != 0 and rotation != 360:
+            output = output.similarity (angle=rotation)
+
+        try:
+            cache_key = self.db.cache.make_key (f"{file_uuid}_{region}_{size}_{mirror}_{rotation}_{quality}_{image_format}")
+            file_path = f"{self.db.iiif_cache_storage}/{cache_key}"
+            target = pyvips.Target.new_to_file (file_path)
+            output.write_to_target (target, f".{image_format}")
+            return send_file (file_path, request.environ, f"image/{image_format}", as_attachment=False)
+        except FileNotFoundError:
+            self.log.error ("File download failed due to missing file: '%s'.", file_path)
 
         return self.error_500 ()
