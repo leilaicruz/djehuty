@@ -1679,6 +1679,7 @@ class ApiServer:
                 if saml_record is None:
                     return self.error_403 (request)
 
+                self.log.info ("SAML record: %s", saml_record)
                 try:
                     if "email" not in saml_record:
                         return self.error_400 (request, "Invalid request", "MissingEmailProperty")
