@@ -158,6 +158,17 @@ def read_quotas_configuration (server, xml_root):
 
     return None
 
+def read_sram_configuration (server, xml_root):
+    """Read the SRAM configuration from XML_ROOT."""
+
+    sram = xml_root.find("authentication/saml/sram")
+    if not sram:
+        return None
+
+    server.sram_organization_api_token = config_value (sram, "organization-api-token", fallback = server.sram_organization_api_token)
+    server.sram_collaboration_id = config_value (sram, "collaboration-id", fallback = server.sram_collaboration_id)
+    return None
+
 def read_saml_configuration (server, xml_root, logger):
     """Read the SAML configuration from XML_ROOT."""
 
@@ -821,6 +832,7 @@ def read_configuration_file (server, config_file, logger, config_files, config=N
         read_handle_configuration (server, xml_root)
         read_email_configuration (server, xml_root, logger)
         read_saml_configuration (server, xml_root, logger)
+        read_sram_configuration (server, xml_root)
         read_automatic_login_configuration (server, xml_root)
         read_privilege_configuration (server, xml_root, logger)
         read_storage_locations (server, xml_root)
