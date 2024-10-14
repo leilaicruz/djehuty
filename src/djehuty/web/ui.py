@@ -383,8 +383,9 @@ def read_group_configuration (server, logger, config_files):
         for group in groups:
             group_name = group.attrib["name"]
             group_id = group.attrib["id"]
+            parent_id = convenience.value_or_none (group.attrib, "parent_id")
             domain = group.attrib["domain"]
-            group_uuid = server.db.insert_group (group_name, True, group_id, domain)
+            group_uuid = server.db.insert_group (group_name, True, group_id, parent_id, domain)
             for member in group:
                 is_supervisor = member.attrib.get("is_supervisor")
                 is_supervisor = is_supervisor == "1"
