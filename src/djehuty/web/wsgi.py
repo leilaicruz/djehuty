@@ -1307,6 +1307,7 @@ class ApiServer:
             record["first_name"] = attributes[self.saml_attribute_first_name][0]
             record["last_name"]  = attributes[self.saml_attribute_last_name][0]
             record["common_name"] = attributes[self.saml_attribute_common_name][0]
+            record["domain"] = None
 
             self.log.info ("Checking domain")
             if self.saml_attribute_groups is not None:
