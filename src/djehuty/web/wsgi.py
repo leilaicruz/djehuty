@@ -1998,13 +1998,13 @@ class ApiServer:
         account_uuid, error_response = self.__depositor_account_uuid (request)
         if error_response is not None:
             return error_response
-
+        account = self.db.account_by_uuid (account_uuid)
         container_uuid, dataset_uuid = self.db.insert_dataset(title = "Untitled item",
-                                                              account_uuid = account_uuid)
+                                                              account_uuid = account_uuid,
+                                                              group_id = value_or_none (account, "group_id"))
         if container_uuid is not None and dataset_uuid is not None:
             # Add oneself as author but don't bail if that doesn't work.
             try:
-                account    = self.db.account_by_uuid (account_uuid)
                 author_uri = URIRef(uuid_to_uri(account["author_uuid"], "author"))
                 self.db.update_item_list (dataset_uuid, account_uuid,
                                           [author_uri], "authors")
