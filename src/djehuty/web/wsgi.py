@@ -1308,6 +1308,7 @@ class ApiServer:
             record["last_name"]  = attributes[self.saml_attribute_last_name][0]
             record["common_name"] = attributes[self.saml_attribute_common_name][0]
             record["domain"] = None
+            record["group_uuid"] = None
 
             self.log.info ("Checking domain")
             if self.saml_attribute_groups is not None:
@@ -1690,7 +1691,7 @@ class ApiServer:
                                             account_uuid)
                         else:
                             # TODO: Fix the supervisor assignment.
-                            if self.db.insert_group_member (saml_record["group_uuid"], account_uuid, False):
+                            if saml_record["group_uuid"] is not None and self.db.insert_group_member (saml_record["group_uuid"], account_uuid, False):
                                 self.log.info ("Added <account:%s> to group <group:%s>.", account_uuid, saml_record["group_uuid"])
                             else:
                                 self.log.info ("Failed to add <account:%s> to group <group:%s>.", account_uuid, saml_record["group_uuid"])
