@@ -1105,12 +1105,14 @@ def main (config_file=None, run_internal_server=True, initialize=True,
             else:
                 logger.info ("Handle prefix:           %s", server.handle_prefix)
 
-            if server.enable_iiif and not PYVIPS_DEPENDENCY_LOADED:
-                logger.error ("Dependency 'pyvips' is required for IIIF.")
-                if PYVIPS_ERROR_MESSAGE is not None:
-                    logging.error ("Loading 'pyvips' failed with:\n---\n%s\n---",
-                                   PYVIPS_ERROR_MESSAGE)
-                raise DependencyNotAvailable
+            if server.enable_iiif:
+                if not PYVIPS_DEPENDENCY_LOADED:
+                    logger.error ("Dependency 'pyvips' is required for IIIF.")
+                    if PYVIPS_ERROR_MESSAGE is not None:
+                        logging.error ("Loading 'pyvips' failed with:\n---\n%s\n---",
+                                       PYVIPS_ERROR_MESSAGE)
+                    raise DependencyNotAvailable
+                logging.getLogger('pyvips').setLevel(logging.ERROR)
 
             if server.identity_provider is not None:
                 logger.info ("Using %s as identity provider.",
