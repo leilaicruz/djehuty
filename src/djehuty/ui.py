@@ -93,6 +93,8 @@ def main_inner ():
                             const='', default=None)
     web_parser.add_argument('--apply-transactions', '-A', nargs='?',
                             const='', default=None)
+    web_parser.add_argument('--full-rdf-export', '-f', action='store_true')
+    web_parser.add_argument('--public-rdf-export', '-p', action='store_true')
 
     ### GLOBAL ARGUMENTS
     ### -----------------------------------------------------------------------
@@ -125,7 +127,8 @@ def main_inner ():
     if args.command == "web":
         web_ui.main (args.config_file, True, args.initialize,
                      args.extract_transactions_from_log,
-                     args.apply_transactions)
+                     args.apply_transactions, args.full_rdf_export,
+                     args.public_rdf_export)
 
     elif len(sys.argv) == 1:
         print("Try --help for usage options.")
