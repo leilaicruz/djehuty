@@ -1703,33 +1703,6 @@ class ApiServer:
                                            saml_record["domain"], account_uuid)
                         self.log.access ("Account %s logged in via SAML.", account_uuid) #  pylint: disable=no-member
                     else:
-                        if (self.sram_collaboration_id is not None and
-                            self.sram_organization_api_token is not None):
-                            try:
-                                sram_uid = saml_record["session"]["samlNameId"]
-                                headers = {
-                                    "Accept": "application/json",
-                                    "Authorization": f"Bearer {self.sram_organization_api_token}",
-                                    "Content-Type": "application/json"
-                                }
-                                json_data = { "role": "member", "uid": sram_uid }
-                                response = requests.put (f"https://sram.surf.nl/api/collaborations/v1/{self.sram_collaboration_id}/members",
-                                                         headers = headers,
-                                                         timeout = 60,
-                                                         json    = json_data)
-                                if response.status_code == 201:
-                                    self.log.info ("Registered '%s' to SRAM.", saml_record["email"])
-                                if response.status_code == 401:
-                                    self.log.warning ("Missing Authorization for SRAM API.")
-                                if response.status_code == 403:
-                                    self.log.warning ("SRAM API authentication failed.")
-                                if response.status_code == 404:
-                                    self.log.warning ("SRAM API endpoint not found.")
-                            except (TypeError, KeyError):
-                                self.log.warning ("Cannot find the UID for SRAM of user '%s'.", saml_record["email"])
-                            except requests.exceptions.ConnectionError:
-                                self.log.error ("Failed to update a DOI due to a connection error.")
-
                         account_uuid = self.db.insert_account (
                             email       = saml_record["email"],
                             first_name  = value_or_none (saml_record, "first_name"),
@@ -1741,6 +1714,33 @@ class ApiServer:
                             self.log.error ("Creating account for %s failed.", saml_record["email"])
                             return self.error_500()
                         self.log.access ("Account %s created via SAML.", account_uuid) #  pylint: disable=no-member
+
+                    if (self.sram_collaboration_id is not None and
+                        self.sram_organization_api_token is not None):
+                        try:
+                            sram_uid = saml_record["session"]["samlNameId"]
+                            headers = {
+                                "Accept": "application/json",
+                                "Authorization": f"Bearer {self.sram_organization_api_token}",
+                                "Content-Type": "application/json"
+                            }
+                            json_data = { "role": "member", "uid": sram_uid }
+                            response = requests.put (f"https://sram.surf.nl/api/collaborations/v1/{self.sram_collaboration_id}/members",
+                                                     headers = headers,
+                                                     timeout = 60,
+                                                     json    = json_data)
+                            if response.status_code == 201:
+                                self.log.info ("Registered '%s' to SRAM.", saml_record["email"])
+                            if response.status_code == 401:
+                                self.log.warning ("Missing Authorization for SRAM API.")
+                            if response.status_code == 403:
+                                self.log.warning ("SRAM API authentication failed.")
+                            if response.status_code == 404:
+                                self.log.warning ("SRAM API endpoint not found.")
+                        except (TypeError, KeyError):
+                            self.log.warning ("Cannot find the UID for SRAM of user '%s'.", saml_record["email"])
+                        except requests.exceptions.ConnectionError:
+                            self.log.error ("Failed to update a DOI due to a connection error.")
 
                     # For a while we didn't create author records for accounts.
                     # This check creates the missing author records upon login
