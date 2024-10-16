@@ -1741,6 +1741,8 @@ class ApiServer:
                             self.log.warning ("Cannot find the UID for SRAM of user '%s'.", saml_record["email"])
                         except requests.exceptions.ConnectionError:
                             self.log.error ("Failed to update a DOI due to a connection error.")
+                    else:
+                        self.log.error ("SRAM not configured.")
 
                     # For a while we didn't create author records for accounts.
                     # This check creates the missing author records upon login
