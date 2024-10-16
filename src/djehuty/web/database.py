@@ -2099,7 +2099,7 @@ class SparqlInterface:
 
         return self.__run_query (query)
 
-    def delete_dataset_draft (self, container_uuid, dataset_uuid, account_uuid):
+    def delete_dataset_draft (self, container_uuid, dataset_uuid, account_uuid, owner_account_uuid):
         """Remove the draft dataset from a container in the state graph."""
 
         collaborators = self.collaborators(dataset_uuid)
@@ -2111,7 +2111,7 @@ class SparqlInterface:
         result = self.__run_logged_query (query)
         self.cache.invalidate_by_prefix (f"{account_uuid}_storage")
         self.cache.invalidate_by_prefix (f"{dataset_uuid}_dataset_storage")
-        self.cache.invalidate_by_prefix (f"datasets_{account_uuid}")
+        self.cache.invalidate_by_prefix (f"datasets_{owner_account_uuid}")
 
         for collaborator in collaborators:
             self.cache.invalidate_by_prefix(f"datasets_{collaborator['account_uuid']}")

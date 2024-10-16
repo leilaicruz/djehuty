@@ -2126,7 +2126,7 @@ class ApiServer:
                 return self.error_403 (request)
 
             container_uuid = dataset["container_uuid"]
-            if self.db.delete_dataset_draft (container_uuid, dataset["uuid"], account_uuid):
+            if self.db.delete_dataset_draft (container_uuid, dataset["uuid"], account_uuid, dataset["account_uuid"]):
                 return redirect ("/my/datasets", code=303)
 
             return self.error_404 (request)
@@ -4575,7 +4575,7 @@ class ApiServer:
                                                            is_published=False)
 
                 container_uuid = dataset["container_uuid"]
-                if self.db.delete_dataset_draft (container_uuid, dataset["uuid"], account_uuid):
+                if self.db.delete_dataset_draft (container_uuid, dataset["uuid"], account_uuid, dataset["account_uuid"]):
                     return self.respond_204()
             except (IndexError, KeyError):
                 pass
