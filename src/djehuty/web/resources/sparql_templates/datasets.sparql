@@ -152,8 +152,6 @@ WHERE {
     OPTIONAL { ?dataset djht:git_code_hosting_url  ?git_code_hosting_url . }
     OPTIONAL {
       ?dataset   djht:association_criteria  ?association_criteria .
-    }
-    OPTIONAL {
       ?group_uri rdf:type                   djht:InstitutionGroup .
       ?group_uri djht:association_criteria  ?association_criteria .
       ?group_uri djht:name                  ?group_name .
