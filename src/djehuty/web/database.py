@@ -3097,7 +3097,6 @@ class SparqlInterface:
 
         results = self.__run_query (query)
         if results:
-            self.log.info ("account_by_session_token: %s", results)
             return self.__account_with_privileges_and_quotas (results[0])
 
         return None
@@ -3326,11 +3325,10 @@ class SparqlInterface:
 
         if account is None:
             account = self.account_by_session_token (session_token)
-        self.log.info ("__may_execute_role: Account: %s", account)
         try:
             return account[f"may_{task}"]
-        except (KeyError, TypeError) as error:
-            self.log.info ("Error occurred: %s", error)
+        except (KeyError, TypeError):
+            pass
 
         return False
 
