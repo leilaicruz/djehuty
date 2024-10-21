@@ -3329,7 +3329,7 @@ class SparqlInterface:
         try:
             return account[f"may_{task}"]
         except (KeyError, TypeError) as error:
-            pass
+            self.log.info("Error occurred: %s", error)
 
         return False
 
