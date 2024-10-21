@@ -1718,14 +1718,22 @@ class ApiServer:
                     if (self.sram_collaboration_id is not None and
                         self.sram_organization_api_token is not None):
                         try:
+                            invitation_expiry = datetime.now() + timedelta(days=2)
+                            membership_expiry = datetime.now() + timedelta(days=365)
                             sram_uid = saml_record["session"]["samlNameId"]
                             headers = {
                                 "Accept": "application/json",
                                 "Authorization": f"Bearer {self.sram_organization_api_token}",
                                 "Content-Type": "application/json"
                             }
-                            json_data = { "role": "member", "uid": sram_uid }
-                            response = requests.put (f"https://sram.surf.nl/api/collaborations/v1/{self.sram_collaboration_id}/members",
+                            json_data = {
+                                "collaboration_identifier": self.sram_collaboration_id,
+                                "intended_role": "member",
+                                "membership_expiry_date": membership_expiry,
+                                "invitation_expiry_date": invitation_expiry,
+                                "invites": [saml_record["email"]]
+                            }
+                            response = requests.put (f"https://sram.surf.nl/api/invitations/v1/collaboration_invites",
                                                      headers = headers,
                                                      timeout = 60,
                                                      json    = json_data)
