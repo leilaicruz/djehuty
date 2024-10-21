@@ -3097,6 +3097,7 @@ class SparqlInterface:
 
         results = self.__run_query (query)
         if results:
+            self.log.info ("account_by_session_token: %s", results)
             return self.__account_with_privileges_and_quotas (results[0])
 
         return None
