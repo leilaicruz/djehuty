@@ -1720,7 +1720,6 @@ class ApiServer:
                         try:
                             invitation_expiry = datetime.now() + timedelta(days=2)
                             membership_expiry = datetime.now() + timedelta(days=365)
-                            sram_uid = saml_record["session"]["samlNameId"]
                             headers = {
                                 "Accept": "application/json",
                                 "Authorization": f"Bearer {self.sram_organization_api_token}",
@@ -1738,17 +1737,18 @@ class ApiServer:
                                                      timeout = 60,
                                                      json    = json_data)
                             if response.status_code == 201:
-                                self.log.info ("Registered '%s' to SRAM.", saml_record["email"])
+                                self.log.info ("Sent invite to '%s' for SRAM collaboration membership.", saml_record["email"])
                             if response.status_code == 401:
                                 self.log.warning ("Missing Authorization for SRAM API.")
                             if response.status_code == 403:
                                 self.log.warning ("SRAM API authentication failed.")
                             if response.status_code == 404:
                                 self.log.warning ("SRAM API endpoint not found.")
-                        except (TypeError, KeyError):
-                            self.log.warning ("Cannot find the UID for SRAM of user '%s'.", saml_record["email"])
+                        except (TypeError, KeyError) as error:
+                            self.log.warning ("An unexpected error ('%s' )occurred when sending invite to %s.",
+                                              error, saml_record["email"])
                         except requests.exceptions.ConnectionError:
-                            self.log.error ("Failed to update a DOI due to a connection error.")
+                            self.log.error ("Failed to send invite through SRAM due to a connection error.")
                     else:
                         self.log.error ("SRAM not configured.")
 
