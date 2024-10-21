@@ -3325,6 +3325,7 @@ class SparqlInterface:
 
         if account is None:
             account = self.account_by_session_token (session_token)
+        self.log.info("__may_execute_role: Account: %s", account)
         try:
             return account[f"may_{task}"]
         except (KeyError, TypeError) as error:
