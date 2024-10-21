@@ -1728,8 +1728,8 @@ class ApiServer:
                             json_data = {
                                 "collaboration_identifier": self.sram_collaboration_id,
                                 "intended_role": "member",
-                                "membership_expiry_date": membership_expiry,
-                                "invitation_expiry_date": invitation_expiry,
+                                "membership_expiry_date": int(membership_expiry.timestamp()),
+                                "invitation_expiry_date": int(invitation_expiry.timestamp()),
                                 "invites": [saml_record["email"]]
                             }
                             response = requests.put (f"https://sram.surf.nl/api/invitations/v1/collaboration_invites",
