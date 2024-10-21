@@ -3327,7 +3327,7 @@ class SparqlInterface:
             account = self.account_by_session_token (session_token)
         try:
             return account[f"may_{task}"]
-        except (KeyError, TypeError):
+        except (KeyError, TypeError) as error:
             pass
 
         return False
