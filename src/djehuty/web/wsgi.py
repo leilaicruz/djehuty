@@ -1705,7 +1705,7 @@ class ApiServer:
                             datasets = self.db.datasets (account_uuid = account_uuid, is_published=False, limit=10000, use_cache=False)
                             self.log.info ("Datasets from DB: %s", datasets)
                             for dataset in datasets:
-                                self.log.info ("Dataset: '%s' in group '%s'", value_or_none (dataset, group_name))
+                                self.log.info ("Dataset: '%s' in group '%s'", value_or_none (dataset, "group_name"))
                                 if "group_name" not in dataset:
                                     self.db.associate_dataset_with_group (dataset["uri"], saml_record["domain"], account_uuid)
 
