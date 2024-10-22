@@ -2529,6 +2529,17 @@ class SparqlInterface:
 
         return True
 
+    def associate_dataset_with_group (self, dataset_uri, association_criteria, account_uuid):
+        """Associate a dataset to a group."""
+
+        graph = Graph()
+        rdf.add (graph, URIRef(dataset_uri), rdf.DJHT["association_criteria"], association_criteria, XSD.string)
+        if self.add_triples_from_graph (graph):
+            self.cache.invalidate_by_prefix (f"datasets_{account_uuid}")
+            self.log.info ("Associated <%s> to group '%s'", dataset_uri, association_criteria)
+            return True
+        return False
+
     def delete_dataset_embargo (self, dataset_uri, account_uuid):
         """Procedure to lift the embargo on a dataset."""
 

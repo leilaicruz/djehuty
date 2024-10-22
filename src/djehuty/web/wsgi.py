@@ -1326,7 +1326,7 @@ class ApiServer:
                         self.log.info ("Checking whether '%s' group exists.", domain)
                         group = self.db.group (association=domain)
                         if group:
-                            self.log.info ("Assocation found")
+                            self.log.info ("Association found")
                             record["domain"] = domain
                             record["group_uuid"] = group[0]["uuid"]
                             break
@@ -1697,6 +1697,14 @@ class ApiServer:
                             # TODO: Fix the supervisor assignment.
                             if saml_record["group_uuid"] is not None and self.db.insert_group_member (saml_record["group_uuid"], account_uuid, False):
                                 self.log.info ("Added <account:%s> to group <group:%s>.", account_uuid, saml_record["group_uuid"])
+
+                                # When a dataset was created before the owner
+                                # was placed in a group, assign those datasets
+                                # to the group automatically.
+                                datasets = self.db.datasets (account_uuid = account_uuid)
+                                for dataset in datasets:
+                                    if "group_name" not in dataset:
+                                        self.db.associate_dataset_with_group (dataset["uri"], saml_record["domain"], account_uuid)
                             else:
                                 self.log.info ("Failed to add <account:%s> to group <group:%s>.", account_uuid, saml_record["group_uuid"])
                             self.log.info ("Updated domain to '%s' for account <account:%s>.",
@@ -1733,7 +1741,7 @@ class ApiServer:
                                 "invitation_expiry_date": int(invitation_expiry.timestamp()) * 1000,
                                 "invites": [saml_record["email"]]
                             }
-                            response = requests.put (f"https://sram.surf.nl/api/invitations/v1/collaboration_invites",
+                            response = requests.put ("https://sram.surf.nl/api/invitations/v1/collaboration_invites",
                                                      headers = headers,
                                                      timeout = 60,
                                                      json    = json_data)
