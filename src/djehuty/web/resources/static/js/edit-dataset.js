@@ -157,6 +157,9 @@ function save_dataset (dataset_uuid, event, notify=true, on_success=jQuery.noop)
     event.preventDefault();
     event.stopPropagation();
 
+    // When keywords were entered but yet submitted, handle those first.
+    add_tag (dataset_uuid);
+
     form_data = gather_form_data();
     jQuery.ajax({
         url:         `/v2/account/articles/${dataset_uuid}`,
@@ -1274,10 +1277,23 @@ function activate (dataset_uuid, permissions=null, callback=jQuery.noop) {
         jQuery(".article-content-loader").hide();
         jQuery(".article-content").fadeIn(200);
         jQuery("#thumbnail-files-wrapper").hide();
+
+        jQuery("#api-upload-fold").hide();
+        jQuery("#api-upload-toggle").on("click", function (event) { toggle_api_upload_text (event); });
         callback ();
     }).fail(function () { show_message ("failure", `<p>Failed to retrieve article ${dataset_uuid}.</p>`); });
 }
 
+function toggle_api_upload_text (event) {
+    event.preventDefault();
+    event.stopPropagation();
+
+    if (jQuery("#api-upload-fold").is(":hidden")) {
+        jQuery("#api-upload-fold").slideDown(250);
+    } else {
+        jQuery("#api-upload-fold").slideUp(250);
+    }
+}
 function toggle_embargo_options (event) {
     event.preventDefault();
     event.stopPropagation();

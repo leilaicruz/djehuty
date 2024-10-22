@@ -1856,6 +1856,9 @@ class ApiServer:
         if isinstance (account_uuid, Response):
             return account_uuid
 
+        if not validator.is_valid_uuid (dataset_id):
+            return self.error_404 (request)
+
         dataset = None
         try:
             dataset = self.db.datasets (dataset_uuid    = dataset_id,
@@ -1897,6 +1900,9 @@ class ApiServer:
         """Implements /admin/impersonate/<id>."""
         if not self.accepts_html (request):
             return self.error_406 ("text/html")
+
+        if not validator.is_valid_uuid (account_uuid):
+            return self.error_404 (request)
 
         token = self.token_from_cookie (request)
         if not self.db.may_impersonate (token):
@@ -2129,7 +2135,8 @@ class ApiServer:
                 permissions = permissions,
                 account    = account,
                 categories = categories,
-                groups     = groups)
+                groups     = groups,
+                api_token  = self.token_from_request (request))
 
         except IndexError:
             return self.error_403 (request)
@@ -2397,6 +2404,9 @@ class ApiServer:
         if account_uuid is None:
             return self.error_authorization_failed(request)
 
+        if not validator.is_valid_uuid (session_uuid):
+            return self.error_404 (request)
+
         if request.method in ("GET", "HEAD"):
             if self.accepts_html (request):
                 try:
@@ -2461,6 +2471,9 @@ class ApiServer:
         if not self.accepts_html (request):
             return self.error_406 ("text/html")
 
+        if not validator.is_valid_uuid (session_uuid):
+            return self.error_404 (request)
+
         if request.method == "GET":
             return self.__render_template (request, "activate_2fa_session.html",
                                            session_uuid=session_uuid)
@@ -2497,6 +2510,9 @@ class ApiServer:
         """Implements /my/sessions/<id>/delete."""
         if not self.accepts_html (request):
             return self.error_406 ("text/html")
+
+        if not validator.is_valid_uuid (session_uuid):
+            return self.error_404 (request)
 
         account_uuid = self.account_uuid_from_request (request)
         if account_uuid is None:
@@ -2907,6 +2923,9 @@ class ApiServer:
             self.log.error ("Account %s attempted a reviewer action.", account_uuid)
             return error_response
 
+        if not validator.is_valid_uuid (dataset_id):
+            return self.error_404 (request)
+
         dataset    = None
         try:
             dataset = self.db.datasets (dataset_uuid    = dataset_id,
@@ -2932,6 +2951,9 @@ class ApiServer:
         if error_response is not None:
             self.log.error ("Account %s attempted a reviewer action.", account_uuid)
             return error_response
+
+        if not validator.is_valid_uuid (dataset_id):
+            return self.error_404 (request)
 
         dataset = None
         try:
@@ -3319,8 +3341,9 @@ class ApiServer:
                 "page":      page,
                 "page_size": page_size,
             })
+            validator.integer_value ({ "id": category_id }, "id", required=True)
         except validator.ValidationException:
-            pass
+            return self.error_404 (request)
 
         category      = self.db.category_by_id (category_id)
         if category is None:
@@ -8015,12 +8038,16 @@ class ApiServer:
             if request.method == 'DELETE':
                 tag_encoded = validator.string_value (request.args, "tag", 0, 1024, True)
                 tag         = unquote(tag_encoded)
-                tags.remove (next (filter (lambda item: item == tag, tags)))
-                if not self.db.update_item_list (item["uuid"], account_uuid, tags, "tags"):
-                    self.log.error ("Deleting a tag failed.")
-                    return self.error_500()
+                try:
+                    tags.remove (next (filter (lambda item: item == tag, tags)))
+                    if self.db.update_item_list (item["uuid"], account_uuid, tags, "tags"):
+                        return self.respond_204()
+                except StopIteration:
+                    pass
 
-                return self.respond_204()
+                self.log.error ("Deleting tag '%s' failed for <%s>.", tag, item["uri"])
+                return self.error_500()
+
 
             ## For POST and PUT requests, the 'parameters' will be a dictionary
             ## containing a key "references", which can contain multiple
@@ -8843,19 +8870,21 @@ class ApiServer:
     ## ------------------------------------------------------------------------
 
     def __metadata_export_parameters (self, item_id, version=None, item_type="dataset", from_draft=False):
-        """collect patameters for various export formats"""
+        """Collect parameters for various export formats."""
 
-        container_uuid = self.db.container_uuid_by_id(item_id)
+        container_uuid = item_id
+        if parses_to_int (item_id):
+            container_uuid = self.db.container_uuid_by_id(item_id)
+        elif not validator.is_valid_uuid (item_id):
+            return None
+
         is_dataset = item_type == "dataset"
-        items_function = None
+        items_function = self.db.collections
         if is_dataset:
-            items_function     = self.db.datasets
-        else:
-            items_function     = self.db.collections
+            items_function = self.db.datasets
         container = self.db.container(container_uuid, item_type=item_type, use_cache=bool(version))
-        if version:
-            current_version = version
-        else:
+        current_version = version
+        if not version:
             current_version = value_or(container, 'latest_published_version_number', 0)
             if from_draft:
                 current_version += 1
@@ -8878,7 +8907,8 @@ class ApiServer:
                 if item is not None and "published_date" in item:
                     published_date = item['published_date'][:10]
             except IndexError:
-                self.log.error("Nothing found for %s %s version %s.", item_type, item_id, current_version)
+                self.log.warning ("Nothing found for %s %s version %s.",
+                                  item_type, item_id, current_version)
 
         if item is None:
             return None
