@@ -1690,6 +1690,11 @@ class ApiServer:
                     account = self.db.account_by_email (saml_record["email"].lower())
                     if account:
                         account_uuid = account["uuid"]
+
+                        # Reset previous group association.
+                        if saml_record["domain"] is None:
+                            saml_record["domain"] = ""
+
                         if not self.db.update_account (account_uuid, domain=saml_record["domain"]):
                             self.log.error ("Unable to update the association for account %s",
                                             account_uuid)
