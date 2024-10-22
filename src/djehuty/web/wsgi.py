@@ -1702,8 +1702,9 @@ class ApiServer:
                             # When a dataset was created before the owner
                             # was placed in a group, assign those datasets
                             # to the group automatically.
-                            datasets = self.db.datasets (account_uuid = account_uuid)
+                            datasets = self.db.datasets (account_uuid = account_uuid, limit=None)
                             for dataset in datasets:
+                                self.log.info ("Dataset: '%s' in group '%s'", value_or_none (dataset, group_name))
                                 if "group_name" not in dataset:
                                     self.db.associate_dataset_with_group (dataset["uri"], saml_record["domain"], account_uuid)
 
