@@ -1745,8 +1745,10 @@ class ApiServer:
                                 self.log.warning ("SRAM API authentication failed.")
                             elif response.status_code == 404:
                                 self.log.warning ("SRAM API endpoint not found.")
+                            elif response.status_code == 400:
+                                self.log.info ("Invite already sent to SRAM for '%s'.", saml_record["email"])
                             else:
-                                self.log.info ("SRAM responded with: %s. Presumably, invite was already sent.", response.status_code)
+                                self.log.info ("SRAM unexpectedly responded with: %s", response.status_code)
                         except (TypeError, KeyError) as error:
                             self.log.warning ("An unexpected error ('%s' )occurred when sending invite to %s.",
                                               error, saml_record["email"])
