@@ -1739,12 +1739,14 @@ class ApiServer:
                                                      json    = json_data)
                             if response.status_code == 201:
                                 self.log.info ("Sent invite to '%s' for SRAM collaboration membership.", saml_record["email"])
-                            if response.status_code == 401:
+                            elif response.status_code == 401:
                                 self.log.warning ("Missing Authorization for SRAM API.")
-                            if response.status_code == 403:
+                            elif response.status_code == 403:
                                 self.log.warning ("SRAM API authentication failed.")
-                            if response.status_code == 404:
+                            elif response.status_code == 404:
                                 self.log.warning ("SRAM API endpoint not found.")
+                            else:
+                                self.log.info ("SRAM responded with: %s. Presumably, invite was already sent.", response.status_code)
                         except (TypeError, KeyError) as error:
                             self.log.warning ("An unexpected error ('%s' )occurred when sending invite to %s.",
                                               error, saml_record["email"])
