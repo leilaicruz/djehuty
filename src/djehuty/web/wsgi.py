@@ -1702,7 +1702,7 @@ class ApiServer:
                             # When a dataset was created before the owner
                             # was placed in a group, assign those datasets
                             # to the group automatically.
-                            datasets = self.db.datasets (account_uuid = account_uuid, limit=10000, use_cache=False)
+                            datasets = self.db.datasets (account_uuid = account_uuid, is_published=False, limit=10000, use_cache=False)
                             self.log.info ("Datasets from DB: %s", datasets)
                             for dataset in datasets:
                                 self.log.info ("Dataset: '%s' in group '%s'", value_or_none (dataset, group_name))
