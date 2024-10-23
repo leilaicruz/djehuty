@@ -554,6 +554,7 @@ class ApiServer:
             "site_description":    self.site_description,
             "site_name":           self.site_name,
             "site_shorttag":       self.site_shorttag,
+            "support_email_address": self.support_email_address,
             "small_footer":        self.small_footer,
         }
         if account is None:
