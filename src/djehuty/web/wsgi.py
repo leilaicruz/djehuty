@@ -1655,7 +1655,7 @@ class ApiServer:
             "Authorization": f"Bearer {self.sram_organization_api_token}",
             "Content-Type": "application/json"
         }
-        response = requests.put (f"https://sram.surf.nl/api/collaborations/v1/{self.sram_collaboration_id}",
+        response = requests.get (f"https://sram.surf.nl/api/collaborations/v1/{self.sram_collaboration_id}",
                                  headers = headers,
                                  timeout = 60)
         if response.status_code != 200:
@@ -1672,7 +1672,8 @@ class ApiServer:
                     continue
                 if saml_record["email"].lower() == member["user"]["email"].lower():
                     return True
-        except (TypeError, KeyError):
+        except (TypeError, KeyError) as error:
+            self.log.error ("Checking SRAM response failed with %s.", error)
             return False
 
         return False
