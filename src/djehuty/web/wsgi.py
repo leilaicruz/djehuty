@@ -1618,7 +1618,6 @@ class ApiServer:
 
     def __send_sram_collaboration_invite (self, saml_record):
         invitation_expiry = datetime.now() + timedelta(days=2)
-        membership_expiry = datetime.now() + timedelta(days=365)
         headers = {
             "Accept": "application/json",
             "Authorization": f"Bearer {self.sram_organization_api_token}",
@@ -1628,7 +1627,6 @@ class ApiServer:
             "collaboration_identifier": self.sram_collaboration_id,
             "intended_role": "member",
             # SRAM wants the epoch time in milliseconds.
-            "membership_expiry_date": int(membership_expiry.timestamp()) * 1000,
             "invitation_expiry_date": int(invitation_expiry.timestamp()) * 1000,
             "invites": [saml_record["email"]]
         }
