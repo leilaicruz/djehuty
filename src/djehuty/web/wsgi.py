@@ -1667,8 +1667,8 @@ class ApiServer:
             record = response.json()
             memberships = record["collaboration_memberships"]
             for member in memberships:
-                expiry_date = member["expiry_date"]
-                if expiry_date < datetime.now().timestamp():
+                expiry_date = value_or_none (member, "expiry_date")
+                if expiry_date is not None and expiry_date < datetime.now().timestamp():
                     continue
                 if saml_record["email"].lower() == member["user"]["email"].lower():
                     return True
