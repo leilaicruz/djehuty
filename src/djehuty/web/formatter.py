@@ -9,18 +9,18 @@ def format_collaborator_record (record):
     """Record formatter for collaborators"""
     return {
         "uuid":           conv.value_or_none(record, "uuid"),
-        "account_uuid":   conv.value_or_none(record, "account_uuid"),
-        "first_name":     conv.value_or_none(record, "first_name"),
+        "account_uuid":   conv.value_or_none (record, "account_uuid"),
+        "first_name":     conv.value_or_none (record, "first_name"),
         "last_name":      conv.value_or_none(record, "last_name"),
         "email":          conv.value_or_none(record, "email"),
-        "metadata_read":  conv.value_or_none(record, "metadata_read"),
+        "metadata_read":  conv.value_or_none (record, "metadata_read"),
         "metadata_edit":  conv.value_or_none(record, "metadata_edit"),
         "data_read":      conv.value_or_none(record, "data_read"),
         "data_edit":      conv.value_or_none(record, "data_edit"),
         "data_remove":    conv.value_or_none(record, "data_remove"),
-        "is_supervisor":  conv.value_or_none(record, "is_supervisor"),
-        "group_id":       conv.value_or_none(record, "group_id"),
-        "group_name":     conv.value_or_none(record, "group_name"),
+        "is_supervisor":  conv.value_or_none (record, "is_supervisor"),
+        "group_id":       conv.value_or_none (record, "group_id"),
+        "group_name":     conv.value_or_none (record, "group_name"),
         "is_inferred":    conv.value_or(record, "is_inferred", False)
     }
 
