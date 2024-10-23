@@ -1616,6 +1616,67 @@ class ApiServer:
 
         return self.error_403 (request)
 
+    def __send_sram_collaboration_invite (self, saml_record):
+        invitation_expiry = datetime.now() + timedelta(days=2)
+        membership_expiry = datetime.now() + timedelta(days=365)
+        headers = {
+            "Accept": "application/json",
+            "Authorization": f"Bearer {self.sram_organization_api_token}",
+            "Content-Type": "application/json"
+        }
+        json_data = {
+            "collaboration_identifier": self.sram_collaboration_id,
+            "intended_role": "member",
+            # SRAM wants the epoch time in milliseconds.
+            "membership_expiry_date": int(membership_expiry.timestamp()) * 1000,
+            "invitation_expiry_date": int(invitation_expiry.timestamp()) * 1000,
+            "invites": [saml_record["email"]]
+        }
+        response = requests.put ("https://sram.surf.nl/api/invitations/v1/collaboration_invites",
+                                 headers = headers,
+                                 timeout = 60,
+                                 json    = json_data)
+        if response.status_code == 201:
+            self.log.info ("Sent invite to '%s' for SRAM collaboration membership.", saml_record["email"])
+        elif response.status_code == 401:
+            self.log.warning ("Missing Authorization for SRAM API.")
+        elif response.status_code == 403:
+            self.log.warning ("SRAM API authentication failed.")
+        elif response.status_code == 404:
+            self.log.warning ("SRAM API endpoint not found.")
+        elif response.status_code == 400:
+            self.log.info ("Invite already sent to SRAM for '%s'.", saml_record["email"])
+        else:
+            self.log.info ("SRAM unexpectedly responded with: %s", response.status_code)
+
+    def __already_in_sram_collaboration (self, saml_record):
+        headers = {
+            "Accept": "application/json",
+            "Authorization": f"Bearer {self.sram_organization_api_token}",
+            "Content-Type": "application/json"
+        }
+        response = requests.put (f"https://sram.surf.nl/api/collaborations/v1/{self.sram_collaboration_id}",
+                                 headers = headers,
+                                 timeout = 60)
+        if response.status_code != 200:
+            self.log.error ("Retrieving SRAM collaboration members failed with status code %s",
+                            response.status_code)
+            return False
+
+        try:
+            record = response.json()
+            memberships = record["collaboration_memberships"]
+            for member in memberships:
+                expiry_date = member["expiry_date"]
+                if expiry_date < datetime.now().timestamp():
+                    continue
+                if saml_record["email"].lower() == member["user"]["email"].lower():
+                    return True
+        except (TypeError, KeyError):
+            return False
+
+        return False
+
     def ui_login (self, request):
         """Implements /login."""
 
@@ -1706,7 +1767,9 @@ class ApiServer:
                             datasets = self.db.datasets (account_uuid = account_uuid, is_published=False, limit=10000, use_cache=False)
                             self.log.info ("Datasets from DB: %s", datasets)
                             for dataset in datasets:
-                                self.log.info ("Dataset: '%s' in group '%s'", value_or_none (dataset, "group_name"))
+                                self.log.info ("Dataset: '%s' in group '%s'",
+                                               value_or_none (dataset, "uuid"),
+                                               value_or_none (dataset, "group_name"))
                                 if "group_name" not in dataset:
                                     self.db.associate_dataset_with_group (dataset["uri"], saml_record["domain"], account_uuid)
 
@@ -1734,37 +1797,8 @@ class ApiServer:
                     if (self.sram_collaboration_id is not None and
                         self.sram_organization_api_token is not None):
                         try:
-                            invitation_expiry = datetime.now() + timedelta(days=2)
-                            membership_expiry = datetime.now() + timedelta(days=365)
-                            headers = {
-                                "Accept": "application/json",
-                                "Authorization": f"Bearer {self.sram_organization_api_token}",
-                                "Content-Type": "application/json"
-                            }
-                            json_data = {
-                                "collaboration_identifier": self.sram_collaboration_id,
-                                "intended_role": "member",
-                                # SRAM wants the epoch time in milliseconds.
-                                "membership_expiry_date": int(membership_expiry.timestamp()) * 1000,
-                                "invitation_expiry_date": int(invitation_expiry.timestamp()) * 1000,
-                                "invites": [saml_record["email"]]
-                            }
-                            response = requests.put ("https://sram.surf.nl/api/invitations/v1/collaboration_invites",
-                                                     headers = headers,
-                                                     timeout = 60,
-                                                     json    = json_data)
-                            if response.status_code == 201:
-                                self.log.info ("Sent invite to '%s' for SRAM collaboration membership.", saml_record["email"])
-                            elif response.status_code == 401:
-                                self.log.warning ("Missing Authorization for SRAM API.")
-                            elif response.status_code == 403:
-                                self.log.warning ("SRAM API authentication failed.")
-                            elif response.status_code == 404:
-                                self.log.warning ("SRAM API endpoint not found.")
-                            elif response.status_code == 400:
-                                self.log.info ("Invite already sent to SRAM for '%s'.", saml_record["email"])
-                            else:
-                                self.log.info ("SRAM unexpectedly responded with: %s", response.status_code)
+                            if not self.__already_in_sram_collaboration (saml_record):
+                                self.__send_sram_collaboration_invite (saml_record)
                         except (TypeError, KeyError) as error:
                             self.log.warning ("An unexpected error ('%s' )occurred when sending invite to %s.",
                                               error, saml_record["email"])
