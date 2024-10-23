@@ -1671,6 +1671,8 @@ class ApiServer:
                 if expiry_date is not None and expiry_date < datetime.now().timestamp():
                     continue
                 if saml_record["email"].lower() == member["user"]["email"].lower():
+                    self.log.info ("Account '%s' is already part of an SRAM collaboration.",
+                                   saml_record["email"])
                     return True
         except (TypeError, KeyError) as error:
             self.log.error ("Checking SRAM response failed with %s.", error)
