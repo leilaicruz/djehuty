@@ -366,8 +366,8 @@ def setup_saml_service_provider (server, logger):
             logger.error ("Failed to create '%s'.", saml_cache_dir)
 
 
-def read_group_configuration (server, logger, config_files):
-    """Read the group configuration from XML_ROOT."""
+def refresh_group_configuration (server, logger, config_files):
+    """Read and apply the group configuration from CONFIG_FILES."""
     for config_file in config_files:
         tree = ElementTree.parse(config_file)
         xml_root = tree.getroot()
@@ -1195,7 +1195,7 @@ def main (config_file=None, run_internal_server=True, initialize=True,
                     logger.warning ("Empty the state-graph to re-initialize.")
 
         if not inside_reload:
-            read_group_configuration (server, logger, config_files)
+            refresh_group_configuration (server, logger, config_files)
 
         run_simple (config["address"], config["port"], server,
                     threaded=(config["maximum_workers"] <= 1),

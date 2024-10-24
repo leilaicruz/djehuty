@@ -1745,7 +1745,6 @@ class ApiServer:
                 if saml_record is None:
                     return self.error_403 (request)
 
-                self.log.info ("SAML record: %s", saml_record)
                 try:
                     if "email" not in saml_record:
                         return self.error_400 (request, "Invalid request", "MissingEmailProperty")
@@ -1755,32 +1754,38 @@ class ApiServer:
                         account_uuid = account["uuid"]
 
                         # Reset previous group association.
-                        if saml_record["domain"] is None:
+                        if value_or_none (saml_record, "domain") is None:
                             saml_record["domain"] = ""
 
                         if not self.db.update_account (account_uuid, domain=saml_record["domain"]):
-                            self.log.error ("Unable to update the association for account %s",
-                                            account_uuid)
+                            self.log.error ("Unable to update domain for account:%s", account_uuid)
                         else:
+                            self.log.info ("Updated domain to '%s' for account:%s.",
+                                           saml_record["domain"], account_uuid)
+
                             # When a dataset was created before the owner
                             # was placed in a group, assign those datasets
                             # to the group automatically.
-                            datasets = self.db.datasets (account_uuid = account_uuid, is_published=False, limit=10000, use_cache=False)
-                            self.log.info ("Datasets from DB: %s", datasets)
+                            datasets = self.db.datasets (account_uuid = account_uuid,
+                                                         is_published = False,
+                                                         limit        = 10000,
+                                                         use_cache    = False)
                             for dataset in datasets:
-                                self.log.info ("Dataset: '%s' in group '%s'",
-                                               value_or_none (dataset, "uuid"),
-                                               value_or_none (dataset, "group_name"))
                                 if "group_name" not in dataset:
-                                    self.db.associate_dataset_with_group (dataset["uri"], saml_record["domain"], account_uuid)
+                                    self.db.associate_dataset_with_group (dataset["uri"],
+                                                                          saml_record["domain"],
+                                                                          account_uuid)
 
-                            # TODO: Fix the supervisor assignment.
-                            if saml_record["group_uuid"] is not None and self.db.insert_group_member (saml_record["group_uuid"], account_uuid, False):
-                                self.log.info ("Added <account:%s> to group <group:%s>.", account_uuid, saml_record["group_uuid"])
+                            # The supervisor privileges are defined in the XML configuration.
+                            if (saml_record["group_uuid"] is not None and
+                                self.db.insert_group_member (saml_record["group_uuid"],
+                                                             account_uuid, False)):
+                                self.log.info ("Added account:%s to group group:%s.",
+                                               account_uuid, saml_record["group_uuid"])
                             else:
-                                self.log.info ("Failed to add <account:%s> to group <group:%s>.", account_uuid, saml_record["group_uuid"])
-                            self.log.info ("Updated domain to '%s' for account <account:%s>.",
-                                           saml_record["domain"], account_uuid)
+                                self.log.info ("Failed to add account:%s to group group:%s.",
+                                               account_uuid, saml_record["group_uuid"])
+
                         self.log.access ("Account %s logged in via SAML.", account_uuid) #  pylint: disable=no-member
                     else:
                         account_uuid = self.db.insert_account (
@@ -1801,12 +1806,10 @@ class ApiServer:
                             if not self.__already_in_sram_collaboration (saml_record):
                                 self.__send_sram_collaboration_invite (saml_record)
                         except (TypeError, KeyError) as error:
-                            self.log.warning ("An unexpected error ('%s' )occurred when sending invite to %s.",
+                            self.log.warning ("An error (%s) occurred when sending invite to %s.",
                                               error, saml_record["email"])
                         except requests.exceptions.ConnectionError:
                             self.log.error ("Failed to send invite through SRAM due to a connection error.")
-                    else:
-                        self.log.error ("SRAM not configured.")
 
                     # For a while we didn't create author records for accounts.
                     # This check creates the missing author records upon login
