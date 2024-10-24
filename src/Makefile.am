@@ -23,7 +23,6 @@ PYTHON_FILES =                                                                \
 EXTRA_RESOURCES =                                                             \
     djehuty/backup/resources/contributors_organizations.json                  \
     djehuty/backup/resources/dois.json                                        \
-    djehuty/backup/resources/groups.json                                      \
     djehuty/backup/resources/languages.json                                   \
     djehuty/backup/resources/licenses.json                                    \
     djehuty/backup/resources/public_collections.json                          \
