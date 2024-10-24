@@ -148,6 +148,7 @@ EXTRA_RESOURCES =                                                             \
     djehuty/web/resources/sparql_templates/delete_group_members.sparql        \
     djehuty/web/resources/sparql_templates/delete_inactive_session_by_uuid.sparql \
     djehuty/web/resources/sparql_templates/delete_inferred_collaborators.sparql \
+    djehuty/web/resources/sparql_templates/delete_inferred_groups.sparql \
     djehuty/web/resources/sparql_templates/delete_item_categories.sparql      \
     djehuty/web/resources/sparql_templates/delete_item_from_list.sparql       \
     djehuty/web/resources/sparql_templates/delete_items_all_from_list.sparql  \
@@ -165,6 +166,7 @@ EXTRA_RESOURCES =                                                             \
     djehuty/web/resources/sparql_templates/item_collaborative_permissions.sparql \
     djehuty/web/resources/sparql_templates/latest_datasets_portal.sparql      \
     djehuty/web/resources/sparql_templates/licenses.sparql                    \
+    djehuty/web/resources/sparql_templates/members.sparql \
     djehuty/web/resources/sparql_templates/missing_checksummed_files_for_container.sparql \
     djehuty/web/resources/sparql_templates/missing_dois.sparql                \
     djehuty/web/resources/sparql_templates/opendap_to_doi.sparql              \

@@ -28,8 +28,5 @@ WHERE {
     BIND(STRAFTER(STR(?account), "account:") AS ?account_uuid)
   }
 FILTER (?group_uri = <group:{{group_uuid}}>)
-{%- if account_uuid is not none %}
-#FILTER (?account = <account:{{account_uuid}}>)
-{%- endif %}
 }
 {% endblock %}
