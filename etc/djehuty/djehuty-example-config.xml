@@ -100,7 +100,7 @@
     <group name="Delft University of Technology Students" domain="student.tudelft.nl" id="28628" parent_id="28586" is_featured="1" />
     <group name="Delft University of Technology" domain="tudelft.nl" id="28586" parent_id="28585" is_featured="1"  />
     <group name="Deltares" domain="deltares.nl" id="34907" parent_id="28598" />
-    <group name="Eindhoven University of Technology Students" domain="student.tue.nl" id="28631" parent_id="28589" />
+    <group name="Eindhoven University of Technology Students" domain="student.tue.nl" id="28631" parent_id="28589" is_featured="1" />
     <group name="Eindhoven University of Technology" domain="tue.nl" parent_id="28585" id="28589" is_featured="1" />
     <group name="Erasmus University Rotterdam" domain="eur.nl" id="34904" parent_id="28598" />
     <group name="IHE Delft Institute for Water Education" domain="un-ihe.org" id="34910" parent_id="28598" />
