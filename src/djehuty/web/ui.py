@@ -385,10 +385,10 @@ def read_group_configuration (server, logger, config_files):
             group_id = group.attrib["id"]
             parent_id = convenience.value_or_none (group.attrib, "parent_id")
             domain = group.attrib["domain"]
-            group_uuid = server.db.insert_group (group_name, True, group_id, parent_id, domain)
+            is_featured = group.attrib.get("is_featured") == "1"
+            group_uuid = server.db.insert_group (group_name, True, is_featured, group_id, parent_id, domain)
             for member in group:
-                is_supervisor = member.attrib.get("is_supervisor")
-                is_supervisor = is_supervisor == "1"
+                is_supervisor = member.attrib.get("is_supervisor") == "1"
                 email = member.attrib.get("email")
                 if email is None:
                     logger.error ("Account must have 'email' attribute.")

@@ -1892,7 +1892,7 @@ class SparqlInterface:
         })
         return self.__run_query(query)
 
-    def insert_group (self, name, is_inferred, group_id, parent_id, domain):
+    def insert_group (self, name, is_inferred, is_featured, group_id, parent_id, domain):
         """Procedure to create a new group."""
         graph = Graph()
         group_uri = rdf.unique_node("group")
@@ -1901,6 +1901,7 @@ class SparqlInterface:
         rdf.add(graph, group_uri, rdf.DJHT["name"], name, XSD.string)
         rdf.add(graph, group_uri, RDF.type, rdf.DJHT["InstitutionGroup"], "uri")
         rdf.add(graph, group_uri, rdf.DJHT["is_inferred"], is_inferred, XSD.boolean)
+        rdf.add(graph, group_uri, rdf.DJHT["is_featured"], is_featured, XSD.boolean)
         rdf.add(graph, group_uri, rdf.DJHT["id"], group_id, XSD.integer)
         rdf.add(graph, group_uri, rdf.DJHT["parent_id"], parent_id, XSD.integer)
 
