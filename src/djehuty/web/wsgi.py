@@ -121,6 +121,11 @@ class ApiServer:
         self.saml_attribute_first_name = "urn:mace:dir:attribute-def:givenName"
         self.saml_attribute_last_name = "urn:mace:dir:attribute-def:sn"
         self.saml_attribute_common_name = "urn:mace:dir:attribute-def:cn"
+        self.saml_attribute_groups = None
+        self.saml_attribute_group_prefix = None
+
+        self.sram_organization_api_token = None
+        self.sram_collaboration_id = None
 
         self.datacite_url        = None
         self.datacite_id         = None
@@ -374,7 +379,7 @@ class ApiServer:
             R("/v3/profile/picture/<account_uuid>",                              self.api_v3_profile_picture_for_account),
             R("/v3/tags/search",                                                 self.api_v3_tags_search),
             R("/v3/datasets/<dataset_uuid>/collaborators",                       self.api_v3_dataset_collaborators),
-            R("/v3/datasets/<dataset_uuid>/collaborators/<collaborator_uuid>",   self.api_v3_dataset_remove_collaborator),
+            R("/v3/datasets/<dataset_uuid>/collaborators/<collaborator_uuid>",   self.api_v3_update_collaborators),
             R("/v3/accounts/search",                                             self.api_v3_accounts_search),
             R("/v3/authors/<author_uuid>",                                       self.api_v3_author_details),
 
@@ -484,7 +489,7 @@ class ApiServer:
         try:
             original  = Image.open (input_filename)
             extension = original.format.lower()
-            output_filename = f"{self.db.thumbnail_storage}/{dataset_uuid}.{extension}"
+            output_filename = os.path.join (self.db.thumbnail_storage, f"{dataset_uuid}.{extension}")
 
             # When the image is the exact thumbnail size.
             if original.width == max_width and original.height == max_height:
@@ -563,6 +568,7 @@ class ApiServer:
             "site_description":    self.site_description,
             "site_name":           self.site_name,
             "site_shorttag":       self.site_shorttag,
+            "support_email_address": self.support_email_address,
             "small_footer":        self.small_footer,
         }
         if account is None:
@@ -705,7 +711,7 @@ class ApiServer:
         git_repository_url = None
         if value_or_none (dataset, "defined_type_name") == "software":
             try:
-                if os.path.exists (f"{self.db.storage}/{dataset['git_uuid']}.git"):
+                if os.path.exists (os.path.join (self.db.storage, f"{dataset['git_uuid']}.git")):
                     git_repository_url = f"{self.base_url}/v3/datasets/{dataset['git_uuid']}.git"
             except KeyError:
                 pass
@@ -718,7 +724,7 @@ class ApiServer:
     def error_400_list (self, request, errors):
         """Procedure to respond with HTTP 400 with a list of error messages."""
         response = None
-        if self.accepts_html (request):
+        if self.accepts_html (request, strict=True):
             response = self.__render_template (request, "400.html", message=errors)
         else:
             response = self.response (json.dumps(errors))
@@ -735,7 +741,7 @@ class ApiServer:
     def error_403 (self, request):
         """Procedure to respond with HTTP 403."""
         response = None
-        if self.accepts_html (request):
+        if self.accepts_html (request, strict=True):
             response = self.__render_template (request, "403.html")
         else:
             response = self.response (json.dumps({
@@ -747,7 +753,7 @@ class ApiServer:
     def error_404 (self, request):
         """Procedure to respond with HTTP 404."""
         response = None
-        if self.accepts_html (request):
+        if self.accepts_html (request, strict=True):
             response = self.__render_template (request, "404.html")
         else:
             response = self.response (json.dumps({
@@ -773,7 +779,7 @@ class ApiServer:
 
     def error_410 (self, request):
         """Procedure to respond with HTTP 410."""
-        if self.accepts_html (request):
+        if self.accepts_html (request, strict=True):
             response = self.__render_template (request, "410.html")
         else:
             response = self.response (json.dumps({
@@ -816,7 +822,7 @@ class ApiServer:
 
     def error_authorization_failed (self, request):
         """Procedure to handle authorization failures."""
-        if self.accepts_html (request):
+        if self.accepts_html (request, strict=True):
             response = self.__render_template (request, "403.html")
         else:
             response = self.response (json.dumps({
@@ -864,7 +870,7 @@ class ApiServer:
         """Returns a self.response object with some tweaks."""
 
         output                   = Response(content, mimetype=mimetype)
-        output.headers["Server"] = "4TU.ResearchData API"
+        output.headers["Server"] = f"{self.site_name} API"
         return output
 
     ## GENERAL HELPERS
@@ -1048,7 +1054,7 @@ class ApiServer:
         validator.boolean_value (record, "is_latest")
 
         try:
-            validator.string_value (record, "search_for",      maximum_length=1024)
+            validator.string_value (record, "search_for", maximum_length=1024, strip_html=False)
         except validator.InvalidValueType:
             validator.array_value  (record, "search_for" )
 
@@ -1319,6 +1325,21 @@ class ApiServer:
             record["first_name"] = attributes[self.saml_attribute_first_name][0]
             record["last_name"]  = attributes[self.saml_attribute_last_name][0]
             record["common_name"] = attributes[self.saml_attribute_common_name][0]
+            record["domain"] = None
+            record["group_uuid"] = None
+
+            if self.saml_attribute_groups is not None:
+                groups = attributes[self.saml_attribute_groups]
+                for group in groups:
+                    prefix = f"{self.saml_attribute_group_prefix}:"
+                    if group.startswith(prefix):
+                        domain = group[len(prefix):].replace("_", ".")
+                        group = self.db.group (association=domain)
+                        if group:
+                            record["domain"] = domain
+                            record["group_uuid"] = group[0]["uuid"]
+                            break
+
         except (KeyError, IndexError):
             self.log.error ("Didn't receive expected fields in SAMLResponse.")
             self.log.error ("Received attributes: %s", attributes)
@@ -1368,11 +1389,12 @@ class ApiServer:
             global_match = "*/*" in acceptable
             return global_match or exact_match
         except KeyError:
-            return False
+            # No "Accept" header can be treated as equivalent to "Accept: */*".
+            return not strict
 
-    def accepts_html (self, request):
+    def accepts_html (self, request, strict=False):
         """Procedure to check whether the client accepts HTML."""
-        return self.accepts_content_type (request, "text/html")
+        return self.accepts_content_type (request, "text/html", strict=strict)
 
     def accepts_plain_text (self, request):
         """Procedure to check whether the client accepts plain text."""
@@ -1511,19 +1533,19 @@ class ApiServer:
     def respond_202 (self):
         """Procedure to respond with HTTP 202."""
         output = Response("", 202, {})
-        output.headers["Server"] = "4TU.ResearchData API"
+        output.headers["Server"] = f"{self.site_name} API"
         return output
 
     def respond_204 (self):
         """Procedure to respond with HTTP 204."""
         output = Response("", 204, {})
-        output.headers["Server"] = "4TU.ResearchData API"
+        output.headers["Server"] = f"{self.site_name} API"
         return output
 
     def respond_205 (self):
         """Procedure to respond with HTTP 205."""
         output = Response("", 205, {})
-        output.headers["Server"] = "4TU.ResearchData API"
+        output.headers["Server"] = f"{self.site_name} API"
         return output
 
     ## API CALLS
@@ -1531,7 +1553,7 @@ class ApiServer:
 
     def ui_redirect_to_home (self, request):
         """Implements /."""
-        if self.accepts_html (request):
+        if self.accepts_html (request, strict=True):
             return redirect ("/", code=301)
 
         return self.response (json.dumps({ "status": "OK" }))
@@ -1601,6 +1623,81 @@ class ApiServer:
                               f"{self.base_url}/login"), 302)
 
         return self.error_403 (request)
+
+    def __send_sram_collaboration_invite (self, saml_record):
+
+        if (self.sram_organization_api_token is None or
+            self.sram_collaboration_id is None or
+            "email" not in saml_record):
+            return None
+
+        invitation_expiry = datetime.now() + timedelta(days=2)
+        headers = {
+            "Accept": "application/json",
+            "Authorization": f"Bearer {self.sram_organization_api_token}",
+            "Content-Type": "application/json"
+        }
+        json_data = {
+            "collaboration_identifier": self.sram_collaboration_id,
+            "intended_role": "member",
+            # SRAM wants the epoch time in milliseconds.
+            "invitation_expiry_date": int(invitation_expiry.timestamp()) * 1000,
+            "invites": [saml_record["email"]]
+        }
+        response = requests.put ("https://sram.surf.nl/api/invitations/v1/collaboration_invites",
+                                 headers = headers,
+                                 timeout = 60,
+                                 json    = json_data)
+        if response.status_code == 201:
+            self.log.info ("Sent invite to '%s' for SRAM collaboration membership.",
+                           saml_record["email"])
+        elif response.status_code == 401:
+            self.log.warning ("Missing Authorization for SRAM API.")
+        elif response.status_code == 403:
+            self.log.warning ("SRAM API authentication failed.")
+        elif response.status_code == 404:
+            self.log.warning ("SRAM API endpoint not found.")
+        else:
+            self.log.info ("SRAM unexpectedly responded with: %s", response.status_code)
+
+        return None
+
+    def __already_in_sram_collaboration (self, saml_record):
+
+        if (self.sram_organization_api_token is None or
+            self.sram_collaboration_id is None or
+            "email" not in saml_record):
+            return None
+
+        headers = {
+            "Accept": "application/json",
+            "Authorization": f"Bearer {self.sram_organization_api_token}",
+            "Content-Type": "application/json"
+        }
+        response = requests.get (f"https://sram.surf.nl/api/collaborations/v1/{self.sram_collaboration_id}",
+                                 headers = headers,
+                                 timeout = 60)
+        if response.status_code != 200:
+            self.log.error ("Retrieving SRAM collaboration members failed with status code %s",
+                            response.status_code)
+            return False
+
+        try:
+            record = response.json()
+            memberships = record["collaboration_memberships"]
+            for member in memberships:
+                expiry_date = value_or_none (member, "expiry_date")
+                if expiry_date is not None and expiry_date < datetime.now().timestamp():
+                    continue
+                if saml_record["email"].lower() == member["user"]["email"].lower():
+                    self.log.info ("Account '%s' is already part of an SRAM collaboration.",
+                                   saml_record["email"])
+                    return True
+        except (TypeError, KeyError) as error:
+            self.log.error ("Checking SRAM response failed with %s.", error)
+            return False
+
+        return False
 
     def ui_login (self, request):
         """Implements /login."""
@@ -1673,21 +1770,67 @@ class ApiServer:
                     if "email" not in saml_record:
                         return self.error_400 (request, "Invalid request", "MissingEmailProperty")
 
-                    account = self.db.account_by_email (saml_record["email"])
+                    account = self.db.account_by_email (saml_record["email"].lower())
                     if account:
                         account_uuid = account["uuid"]
+
+                        # Reset previous group association.
+                        if value_or_none (saml_record, "domain") is None:
+                            saml_record["domain"] = ""
+
+                        if not self.db.update_account (account_uuid, domain=saml_record["domain"]):
+                            self.log.error ("Unable to update domain for account:%s", account_uuid)
+                        else:
+                            self.log.info ("Updated domain to '%s' for account:%s.",
+                                           saml_record["domain"], account_uuid)
+
+                            # When a dataset was created before the owner
+                            # was placed in a group, assign those datasets
+                            # to the group automatically.
+                            datasets = self.db.datasets (account_uuid = account_uuid,
+                                                         is_published = False,
+                                                         limit        = 10000,
+                                                         use_cache    = False)
+                            for dataset in datasets:
+                                if "group_name" not in dataset:
+                                    self.db.associate_dataset_with_group (dataset["uri"],
+                                                                          saml_record["domain"],
+                                                                          account_uuid)
+
+                            # The supervisor privileges are defined in the XML configuration.
+                            if (value_or_none (saml_record, "group_uuid") is not None and
+                                self.db.insert_group_member (saml_record["group_uuid"],
+                                                             account_uuid, False)):
+                                self.log.info ("Added account:%s to group group:%s.",
+                                               account_uuid, saml_record["group_uuid"])
+                            else:
+                                self.log.info ("Failed to add account:%s to group group:%s.",
+                                               account_uuid, value_or_none (saml_record, "group_uuid"))
+
                         self.log.access ("Account %s logged in via SAML.", account_uuid) #  pylint: disable=no-member
                     else:
                         account_uuid = self.db.insert_account (
-                            email      = saml_record["email"],
-                            first_name = value_or_none (saml_record, "first_name"),
-                            last_name  = value_or_none (saml_record, "last_name"),
+                            email       = saml_record["email"],
+                            first_name  = value_or_none (saml_record, "first_name"),
+                            last_name   = value_or_none (saml_record, "last_name"),
                             common_name = value_or_none (saml_record, "common_name"),
+                            domain      = value_or_none (saml_record, "domain")
                         )
                         if account_uuid is None:
                             self.log.error ("Creating account for %s failed.", saml_record["email"])
                             return self.error_500()
                         self.log.access ("Account %s created via SAML.", account_uuid) #  pylint: disable=no-member
+
+                    if (self.sram_collaboration_id is not None and
+                        self.sram_organization_api_token is not None):
+                        try:
+                            if not self.__already_in_sram_collaboration (saml_record):
+                                self.__send_sram_collaboration_invite (saml_record)
+                        except (TypeError, KeyError) as error:
+                            self.log.warning ("An error (%s) occurred when sending invite to %s.",
+                                              error, value_or_none (saml_record, "email"))
+                        except requests.exceptions.ConnectionError:
+                            self.log.error ("Failed to send invite through SRAM due to a connection error.")
 
                     # For a while we didn't create author records for accounts.
                     # This check creates the missing author records upon login
@@ -1775,6 +1918,9 @@ class ApiServer:
         if isinstance (account_uuid, Response):
             return account_uuid
 
+        if not validator.is_valid_uuid (dataset_id):
+            return self.error_404 (request)
+
         dataset = None
         try:
             dataset = self.db.datasets (dataset_uuid    = dataset_id,
@@ -1816,6 +1962,9 @@ class ApiServer:
         """Implements /admin/impersonate/<id>."""
         if not self.accepts_html (request):
             return self.error_406 ("text/html")
+
+        if not validator.is_valid_uuid (account_uuid):
+            return self.error_404 (request)
 
         token = self.token_from_cookie (request)
         if not self.db.may_impersonate (token):
@@ -1946,12 +2095,13 @@ class ApiServer:
         if error_response is not None:
             return error_response
 
+        account = self.db.account_by_uuid (account_uuid)
         container_uuid, dataset_uuid = self.db.insert_dataset(title = "Untitled item",
-                                                              account_uuid = account_uuid)
+                                                              account_uuid = account_uuid,
+                                                              group_id = value_or_none (account, "group_id"))
         if container_uuid is not None and dataset_uuid is not None:
             # Add oneself as author but don't bail if that doesn't work.
             try:
-                account    = self.db.account_by_uuid (account_uuid)
                 author_uri = URIRef(uuid_to_uri(account["author_uuid"], "author"))
                 self.db.update_item_list (dataset_uuid, account_uuid,
                                           [author_uri], "authors")
@@ -2048,7 +2198,8 @@ class ApiServer:
                 permissions = permissions,
                 account    = account,
                 categories = categories,
-                groups     = groups)
+                groups     = groups,
+                api_token  = self.token_from_request (request))
 
         except IndexError:
             return self.error_403 (request)
@@ -2071,7 +2222,7 @@ class ApiServer:
                 return self.error_403 (request)
 
             container_uuid = dataset["container_uuid"]
-            if self.db.delete_dataset_draft (container_uuid, dataset["uuid"], account_uuid):
+            if self.db.delete_dataset_draft (container_uuid, dataset["uuid"], account_uuid, dataset["account_uuid"]):
                 return redirect ("/my/datasets", code=303)
 
             return self.error_404 (request)
@@ -2316,6 +2467,9 @@ class ApiServer:
         if account_uuid is None:
             return self.error_authorization_failed(request)
 
+        if not validator.is_valid_uuid (session_uuid):
+            return self.error_404 (request)
+
         if request.method in ("GET", "HEAD"):
             if self.accepts_html (request):
                 try:
@@ -2380,6 +2534,9 @@ class ApiServer:
         if not self.accepts_html (request):
             return self.error_406 ("text/html")
 
+        if not validator.is_valid_uuid (session_uuid):
+            return self.error_404 (request)
+
         if request.method == "GET":
             return self.__render_template (request, "activate_2fa_session.html",
                                            session_uuid=session_uuid)
@@ -2416,6 +2573,9 @@ class ApiServer:
         """Implements /my/sessions/<id>/delete."""
         if not self.accepts_html (request):
             return self.error_406 ("text/html")
+
+        if not validator.is_valid_uuid (session_uuid):
+            return self.error_404 (request)
 
         account_uuid = self.account_uuid_from_request (request)
         if account_uuid is None:
@@ -2489,6 +2649,7 @@ class ApiServer:
                                                          account_uuid,
                                                          metadata["read"],
                                                          metadata["edit"],
+                                                         False,
                                                          data["read"],
                                                          data["edit"],
                                                          data["remove"],
@@ -2501,6 +2662,62 @@ class ApiServer:
             return self.respond_205()
 
         return self.error_500 ()
+
+    def api_v3_update_collaborators (self, request, dataset_uuid, collaborator_uuid):
+        """Implements /v3/datasets/<dataset_uuid>/collaborators/<collaborator_uuid>"""
+        account_uuid = self.default_authenticated_error_handling(request,
+                                                                 ["PUT", "DELETE"],
+                                                                 "application/json")
+        if isinstance(account_uuid, Response):
+            return account_uuid
+
+        if (not validator.is_valid_uuid (dataset_uuid) or
+                not validator.is_valid_uuid (collaborator_uuid)):
+            return self.error_404 (request)
+        try:
+            dataset = self.db.datasets (container_uuid=dataset_uuid,
+                                        account_uuid=account_uuid,
+                                        is_published=False,
+                                        is_latest=None,
+                                        limit=1)[0]
+
+            _, error_response = self.__needs_collaborative_permissions(
+                account_uuid, request, "dataset", dataset, "metadata_edit")
+            if error_response is not None:
+                return error_response
+
+            collaborators = self.db.collaborators (dataset["uuid"])
+            for collaborator in collaborators:
+                if collaborator["account_uuid"] == account_uuid and not collaborator["is_supervisor"]:
+                    return self.error_403 (request)
+
+        except IndexError:
+            return self.error_403 (request)
+
+        if request.method == "PUT":
+            parameters = request.get_json()
+            metadata = parameters["metadata"]
+            data = parameters["data"]
+            if not self.db.update_collaborator (dataset["uuid"],
+                                                collaborator_uuid,
+                                                metadata["read"],
+                                                metadata["edit"],
+                                                False,
+                                                data["read"],
+                                                data["edit"],
+                                                data["remove"]):
+                self.log.error ("Could not update permissions for collaborator:%s in dataset:%s",
+                                collaborator_uuid, dataset["uuid"])
+                return self.error_500()
+
+            return self.respond_204()
+
+        if request.method == "DELETE":
+            if self.db.remove_collaborator(dataset["uuid"], collaborator_uuid) is None:
+                return self.error_500()
+            return self.respond_204()
+
+        return self.error_403(request)
 
     def api_v3_accounts_search (self, request):
         """Search and autocomplete to add collaborator"""
@@ -2516,45 +2733,16 @@ class ApiServer:
 
         try:
             parameters = request.get_json()
-            search_for = validator.string_value (parameters, "search_for", 0, 32, required=True)
+            search_for = validator.string_value (parameters, "search_for", 0, 32, required=True, strip_html=False)
+            exclude = validator.array_value (parameters, "exclude", required=False)
             accounts   = self.db.accounts (search_for=search_for, limit=5)
+            for index,_ in enumerate(accounts):
+                account = accounts[index]
+                if account["uuid"] in exclude:
+                    accounts.pop(index)
             return self.default_list_response (accounts, formatter.format_account_details_record)
         except (validator.ValidationException, KeyError) as error:
             return self.error_400(request, error.message, error.code)
-
-    def api_v3_dataset_remove_collaborator (self, request, dataset_uuid, collaborator_uuid):
-        """Removes the collaborator from the share section of edit dataset form."""
-        if not self.accepts_json (request):
-            return self.error_406 ("application/json")
-
-        account_uuid = self.account_uuid_from_request (request)
-        if account_uuid is None:
-            return self.error_authorization_failed (request)
-
-        if (not validator.is_valid_uuid (dataset_uuid) or
-            not validator.is_valid_uuid (collaborator_uuid)):
-            return self.error_404 (request)
-
-        try:
-            dataset = self.db.datasets (container_uuid=dataset_uuid,
-                                        account_uuid=account_uuid,
-                                        is_published=False,
-                                        is_latest=None,
-                                        limit=1)[0]
-
-            _, error_response = self.__needs_collaborative_permissions (
-                account_uuid, request, "dataset", dataset, "metadata_edit")
-            if error_response is not None:
-                return error_response
-
-            if self.db.remove_collaborator (dataset["uuid"], collaborator_uuid) is None:
-                return self.error_500()
-
-            return self.respond_204()
-        except IndexError:
-            pass
-
-        return self.error_403 (request)
 
     def ui_dataset_new_private_link (self, request, dataset_uuid):
         """Implements /my/datasets/<uuid>/private_link/new."""
@@ -2799,6 +2987,9 @@ class ApiServer:
             self.log.error ("Account %s attempted a reviewer action.", account_uuid)
             return error_response
 
+        if not validator.is_valid_uuid (dataset_id):
+            return self.error_404 (request)
+
         dataset    = None
         try:
             dataset = self.db.datasets (dataset_uuid    = dataset_id,
@@ -2824,6 +3015,9 @@ class ApiServer:
         if error_response is not None:
             self.log.error ("Account %s attempted a reviewer action.", account_uuid)
             return error_response
+
+        if not validator.is_valid_uuid (dataset_id):
+            return self.error_404 (request)
 
         dataset = None
         try:
@@ -3133,7 +3327,7 @@ class ApiServer:
             try:
                 validator.string_value (record, "email", 5, 255, False)
                 validator.options_value (record, "type", ["bug", "missing", "other"], True)
-                validator.string_value (record, "description", 10, 4096, True)
+                validator.string_value (record, "description", 10, 4096, True, strip_html=False)
             except validator.ValidationException as error:
                 email = self.__email_from_request (request)
                 return self.__render_template (request, "feedback.html",
@@ -3211,8 +3405,9 @@ class ApiServer:
                 "page":      page,
                 "page_size": page_size,
             })
+            validator.integer_value ({ "id": category_id }, "id", required=True)
         except validator.ValidationException:
-            pass
+            return self.error_404 (request)
 
         category      = self.db.category_by_id (category_id)
         if category is None:
@@ -3437,7 +3632,7 @@ class ApiServer:
             name       = validator.string_value (parameters, "name", required=True)
             dataset_id = validator.string_value (parameters, "dataset_id", required=True)
             version    = validator.string_value (parameters, "version", required=True)
-            reason     = validator.string_value (parameters, "reason", 0, 10000, required=True)
+            reason     = validator.string_value (parameters, "reason", 0, 10000, required=True, strip_html=False)
 
             dataset = self.db.datasets (container_uuid=dataset_id, version=version)[0]
 
@@ -3739,7 +3934,7 @@ class ApiServer:
                     name = file_info['name']
                     if value_or (location, "quirks", False):
                         name = ''.join(char for char in name if char in allowed_chars)
-                    file_path = f"{location['path']}/{file_info['id']}/{name}"
+                    file_path = os.path.join (location['path'], f"{file_info['id']}", name)
                     if os.path.isfile (file_path):
                         return file_path
 
@@ -3763,7 +3958,7 @@ class ApiServer:
             ## Only apply these quirks when enabled.
             if self.db.secondary_storage_quirks:
                 name = ''.join(char for char in name if char in allowed_chars)
-            file_path = f"{self.db.secondary_storage}/{file_info['id']}/{name}"
+            file_path = os.path.join (self.db.secondary_storage, f"{file_info['id']}", name)
 
         return file_path
 
@@ -3894,8 +4089,13 @@ class ApiServer:
         try:
             file_paths = []
             for file_info in metadata:
+                file_path = self.__filesystem_location (file_info)
+                if file_path is None:
+                    self.log.error ("Excluding missing file %s in ZIP of %s.",
+                                    file_info["name"], dataset_id)
+                    continue
                 file_paths.append ({
-                    "fs": self.__filesystem_location (file_info),
+                    "fs": file_path,
                     "n":  file_info["name"]
                 })
 
@@ -3974,7 +4174,7 @@ class ApiServer:
             return account_uuid
 
         ## Our API only contains data from 4TU.ResearchData.
-        return self.response (json.dumps({ "id": 898, "name": "4TU.ResearchData" }))
+        return self.response (json.dumps({ "id": 898, "name": self.site_name }))
 
     def api_private_institution_accounts (self, request):
         """Implements /v2/account/institution/accounts."""
@@ -4296,7 +4496,7 @@ class ApiServer:
                 container_uuid, _ = self.db.insert_dataset (
                     title          = validator.string_value  (record, "title",          3, 1000,                   True),
                     account_uuid     = account_uuid,
-                    description    = validator.string_value  (record, "description",    0, 10000,                  False),
+                    description    = validator.string_value  (record, "description",    0, 10000, False, strip_html=False),
                     tags           = tags,
                     references     = validator.array_value   (record, "references",                                False),
                     categories     = validator.array_value   (record, "categories",                                False),
@@ -4424,7 +4624,7 @@ class ApiServer:
                 result = self.db.update_dataset (dataset["uuid"],
                     account_uuid,
                     title           = validator.string_value  (record, "title",          3, 1000),
-                    description     = validator.string_value  (record, "description",    0, 10000),
+                    description     = validator.string_value  (record, "description",    0, 10000, strip_html=False),
                     resource_doi    = validator.string_value  (record, "resource_doi",   0, 255),
                     resource_title  = validator.string_value  (record, "resource_title", 0, 255),
                     license_url     = license_url,
@@ -4445,13 +4645,13 @@ class ApiServer:
                     is_embargoed    = is_embargoed,
                     is_restricted   = is_restricted,
                     is_metadata_record = validator.boolean_value (record, "is_metadata_record", when_none=False),
-                    metadata_reason = validator.string_value  (record, "metadata_reason",  0, 512),
+                    metadata_reason = validator.string_value  (record, "metadata_reason",  0, 512, strip_html=False),
                     embargo_until_date = validator.date_value (record, "embargo_until_date",
                                                                is_temporary_embargo),
                     embargo_type    = validator.options_value (record, "embargo_type", validator.embargo_types),
                     embargo_title   = validator.string_value  (record, "embargo_title", 0, 1000),
-                    embargo_reason  = validator.string_value  (record, "embargo_reason", 0, 10000),
-                    eula            = validator.string_value  (record, "eula", 0, 50000),
+                    embargo_reason  = validator.string_value  (record, "embargo_reason", 0, 10000, strip_html=False),
+                    eula            = validator.string_value  (record, "eula", 0, 50000, strip_html=False),
                     defined_type_name = defined_type_name,
                     defined_type    = defined_type,
                     git_repository_name = validator.string_value  (record, "git_repository_name",  0, 255),
@@ -4493,7 +4693,7 @@ class ApiServer:
                                                            is_published=False)
 
                 container_uuid = dataset["container_uuid"]
-                if self.db.delete_dataset_draft (container_uuid, dataset["uuid"], account_uuid):
+                if self.db.delete_dataset_draft (container_uuid, dataset["uuid"], account_uuid, dataset["account_uuid"]):
                     return self.respond_204()
             except (IndexError, KeyError):
                 pass
@@ -5578,7 +5778,7 @@ class ApiServer:
                 doi             = validator.string_value (parameters, "doi", 0, 255),
                 handle          = validator.string_value (parameters, "handle", 0, 255),
                 order           = validator.string_value (parameters, "order", 0, 255),
-                search_for      = validator.string_value (parameters, "search_for", 0, 512),
+                search_for      = validator.string_value (parameters, "search_for", 0, 512, strip_html=False),
                 limit           = limit,
                 offset          = offset,
                 order_direction = validator.order_direction (parameters, "order_direction"),
@@ -5768,7 +5968,7 @@ class ApiServer:
                     account_uuid            = account_uuid,
                     funding                 = validator.string_value  (record, "funding",          0, 255,        False),
                     funding_list            = validator.array_value   (record, "funding_list",                    False),
-                    description             = validator.string_value  (record, "description",      0, 10000,      False),
+                    description             = validator.string_value  (record, "description",      0, 10000,      False, strip_html=False),
                     datasets                = validator.array_value   (record, "articles",                        False),
                     authors                 = validator.array_value   (record, "authors",                         False),
                     categories              = validator.array_value   (record, "categories",                      False),
@@ -5842,7 +6042,7 @@ class ApiServer:
                                                                  is_published = False)
                 result = self.db.update_collection (collection["uuid"], account_uuid,
                     title           = validator.string_value  (record, "title",          3, 1000),
-                    description     = validator.string_value  (record, "description",    0, 10000),
+                    description     = validator.string_value  (record, "description",    0, 10000, strip_html=False),
                     resource_doi    = validator.string_value  (record, "resource_doi",   0, 255),
                     resource_title  = validator.string_value  (record, "resource_title", 0, 255),
                     group_id        = validator.integer_value (record, "group_id",       0, pow(2, 63)),
@@ -6507,7 +6707,7 @@ class ApiServer:
             validator.integer_value  (record, "item_type")
             validator.string_value   (record, "doi",             maximum_length=255)
             validator.string_value   (record, "handle",          maximum_length=255)
-            validator.string_value   (record, "search_for",      maximum_length=1024)
+            validator.string_value   (record, "search_for", maximum_length=1024, strip_html=False)
             validator.boolean_value  (record, "is_latest")
 
             if record["groups"] is not None:
@@ -6705,7 +6905,7 @@ class ApiServer:
                 self.log.error ("Failed to add 'git_uuid' for dataset.")
                 return None
 
-        git_directory = f"{self.db.storage}/{dataset['git_uuid']}.git"
+        git_directory = os.path.join (self.db.storage, f"{dataset['git_uuid']}.git")
         if not os.path.exists (git_directory):
             self.log.error ("No Git repository at '%s'", git_directory)
             return None
@@ -6817,6 +7017,7 @@ class ApiServer:
                 continue
 
             relative_path = f"{path}{entry.name}"
+            # The path separator is under our own control, don't use os.path.join here.
             absolute_path = f"{filesystem_path}/{relative_path}"
             record = { "fs": absolute_path, "n": relative_path }
             file_paths.append (record)
@@ -6833,7 +7034,7 @@ class ApiServer:
         with tempfile.TemporaryDirectory(dir = self.db.cache.storage,
                                          prefix = "git-zip-",
                                          delete = False) as folder:
-            git_directory  = f"{self.db.storage}/{git_uuid}.git"
+            git_directory  = os.path.join (self.db.storage, f"{git_uuid}.git")
             git_repository = pygit2.clone_repository (git_directory, folder)
 
             if not isinstance (git_repository, pygit2.Repository):
@@ -7181,7 +7382,7 @@ class ApiServer:
                 "dataset_uuid":       dataset["uuid"],
                 "account_uuid":       account_uuid,
                 "title":              validator.string_value  (record, "title",          3, 1000,  True, errors),
-                "description":        validator.string_value  (record, "description",    0, 10000, True, errors),
+                "description":        validator.string_value  (record, "description",    0, 10000, True, errors, strip_html=False),
                 "resource_doi":       resource_doi,
                 "resource_title":     resource_title,
                 "license_url":        license_url,
@@ -7202,12 +7403,12 @@ class ApiServer:
                 "is_embargoed":       is_embargoed,
                 "is_restricted":      is_restricted,
                 "is_metadata_record": validator.boolean_value (record, "is_metadata_record", when_none=False),
-                "metadata_reason":    validator.string_value  (record, "metadata_reason",  0, 512),
+                "metadata_reason":    validator.string_value  (record, "metadata_reason",  0, 512, strip_html=False),
                 "embargo_until_date": validator.date_value    (record, "embargo_until_date", is_temporary_embargo, errors),
                 "embargo_type":       validator.options_value (record, "embargo_type", validator.embargo_types, is_temporary_embargo, errors),
                 "embargo_title":      validator.string_value  (record, "embargo_title", 0, 1000, is_embargoed, errors),
-                "embargo_reason":     validator.string_value  (record, "embargo_reason", 0, 10000, is_embargoed, errors),
-                "eula":               validator.string_value  (record, "eula", 0, 50000, is_restricted, errors),
+                "embargo_reason":     validator.string_value  (record, "embargo_reason", 0, 10000, is_embargoed, errors, strip_html=False),
+                "eula":               validator.string_value  (record, "eula", 0, 50000, is_restricted, errors, strip_html=False),
                 "defined_type_name":  dataset_type,
                 "defined_type":       defined_type,
                 "agreed_to_deposit_agreement": agreed_to_deposit_agreement,
@@ -7342,7 +7543,7 @@ class ApiServer:
             try:
                 file_data       = request.files['file']
                 _, extension = os.path.splitext (file_data.filename)
-                output_filename = f"{self.db.profile_images_storage}/{account['uuid']}"
+                output_filename = os.path.join (self.db.profile_images_storage, account['uuid'])
 
                 if not (extension.lower() == ".jpg" or extension.lower() == ".png"):
                     return self.error_400 (request, "Only JPG and PNG images are supported.",
@@ -7368,8 +7569,10 @@ class ApiServer:
 
             except OSError:
                 self.log.error ("Writing %s to disk failed.", output_filename)
+                return self.error_400 (request, "Cannot determine the format of the uploaded image.", "InvalidImageFormat")
             except (IndexError, KeyError) as error:
                 self.log.error ("Uploading profile image failed with error: %s", error)
+                return self.error_400 (request, "Uploading the profile image failed.", "UploadFailed")
 
         return self.error_405 (["GET", "POST", "DELETE"])
 
@@ -7570,7 +7773,7 @@ class ApiServer:
                 self.error_500 ()
 
             self.locks.unlock (locks.LockTypes.FILE_LIST)
-            output_filename = f"{self.db.storage}/{dataset_id}_{file_uuid}"
+            output_filename = os.path.join (self.db.storage, f"{dataset_id}_{file_uuid}")
 
             computed_md5 = None
             md5 = hashlib.new ("md5", usedforsecurity=False)
@@ -7907,12 +8110,16 @@ class ApiServer:
             if request.method == 'DELETE':
                 tag_encoded = validator.string_value (request.args, "tag", 0, 1024, True)
                 tag         = unquote(tag_encoded)
-                tags.remove (next (filter (lambda item: item == tag, tags)))
-                if not self.db.update_item_list (item["uuid"], account_uuid, tags, "tags"):
-                    self.log.error ("Deleting a tag failed.")
-                    return self.error_500()
+                try:
+                    tags.remove (next (filter (lambda item: item == tag, tags)))
+                    if self.db.update_item_list (item["uuid"], account_uuid, tags, "tags"):
+                        return self.respond_204()
+                except StopIteration:
+                    pass
 
-                return self.respond_204()
+                self.log.error ("Deleting tag '%s' failed for <%s>.", tag, item["uri"])
+                return self.error_500()
+
 
             ## For POST and PUT requests, the 'parameters' will be a dictionary
             ## containing a key "references", which can contain multiple
@@ -8327,7 +8534,7 @@ class ApiServer:
             self.log.error ("No dataset associated with Git repository '%s'.", git_uuid)
             return self.error_404 (request), None
 
-        git_directory = f"{self.db.storage}/{git_uuid}.git"
+        git_directory = os.path.join (self.db.storage, f"{git_uuid}.git")
         if not os.path.exists (git_directory):
             self.log.error ("No Git repository at '%s'", git_directory)
             return self.error_404 (request), None
@@ -8457,7 +8664,7 @@ class ApiServer:
         try:
             parameters = request.get_json()
             quota_gb   = validator.integer_value (parameters, "new-quota", required=True)
-            reason     = validator.string_value (parameters, "reason", 0, 10000, required=True)
+            reason     = validator.string_value (parameters, "reason", 0, 10000, required=True, strip_html=False)
 
             if quota_gb < 1:
                 return self.error_400 (request,
@@ -8492,7 +8699,7 @@ class ApiServer:
 
         try:
             parameters = request.get_json()
-            search = validator.string_value (parameters, "search_for", 0, 32, required=True)
+            search = validator.string_value (parameters, "search_for", 0, 32, required=True, strip_html=False)
             tags = self.db.previously_used_tags (search)
             tags = list(map (lambda item: item["tag"], tags))
             return self.response (json.dumps (tags))
@@ -8641,7 +8848,7 @@ class ApiServer:
             file_uuid = row["file_uuid"]
             computed_md5 = None
             md5 = hashlib.new ("md5", usedforsecurity=False)
-            filename = f"{self.db.storage}/{container_uuid}_{file_uuid}"
+            filename = os.path.join (self.db.storage, f"{container_uuid}_{file_uuid}")
             with open(filename, "rb") as stream:
                 for chunk in iter(lambda: stream.read(4096), b""): # pylint: disable=cell-var-from-loop
                     md5.update(chunk)
@@ -8735,19 +8942,21 @@ class ApiServer:
     ## ------------------------------------------------------------------------
 
     def __metadata_export_parameters (self, item_id, version=None, item_type="dataset", from_draft=False):
-        """collect patameters for various export formats"""
+        """Collect parameters for various export formats."""
 
-        container_uuid = self.db.container_uuid_by_id(item_id)
+        container_uuid = item_id
+        if parses_to_int (item_id):
+            container_uuid = self.db.container_uuid_by_id(item_id)
+        elif not validator.is_valid_uuid (item_id):
+            return None
+
         is_dataset = item_type == "dataset"
-        items_function = None
+        items_function = self.db.collections
         if is_dataset:
-            items_function     = self.db.datasets
-        else:
-            items_function     = self.db.collections
+            items_function = self.db.datasets
         container = self.db.container(container_uuid, item_type=item_type, use_cache=bool(version))
-        if version:
-            current_version = version
-        else:
+        current_version = version
+        if not version:
             current_version = value_or(container, 'latest_published_version_number', 0)
             if from_draft:
                 current_version += 1
@@ -8770,7 +8979,8 @@ class ApiServer:
                 if item is not None and "published_date" in item:
                     published_date = item['published_date'][:10]
             except IndexError:
-                self.log.error("Nothing found for %s %s version %s.", item_type, item_id, current_version)
+                self.log.warning ("Nothing found for %s %s version %s.",
+                                  item_type, item_id, current_version)
 
         if item is None:
             return None
