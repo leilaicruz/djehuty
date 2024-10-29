@@ -9440,8 +9440,10 @@ class ApiServer:
             file_path = f"{self.db.iiif_cache_storage}/{cache_key}"
             target = pyvips.Target.new_to_file (file_path)
             output.write_to_target (target, f".{image_format}")
-            return send_file (file_path, request.environ, f"image/{image_format}",
+            response = send_file (file_path, request.environ, f"image/{image_format}",
                               as_attachment=False, download_name=None)
+            response.headers["Access-Control-Allow-Origin"] = "*"
+            return response
         except FileNotFoundError:
             self.log.error ("File download failed due to missing file: '%s'.", file_path)
 
