@@ -9317,7 +9317,7 @@ class ApiServer:
                 "extraFormats": ["jpg", "png", "tif", "webp"],
                 "extraFeatures": ["cors", "mirroring", "regionByPx",
                                   "regionSquare", "rotationArbitrary",
-                                  "rotationBy90s"]
+                                  "rotationBy90s"],
                 "sizes": [{ "width": image.width, "height": image.height }]
             }
             del image
@@ -9417,6 +9417,32 @@ class ApiServer:
         try:
             output = pyvips.Image.new_temp_file(format=f".{image_format}")
             original.write(output)
+
+            output = output.crop (output_region["x"], output_region["y"],
+                                  output_region["w"], output_region["h"])
+
+            if rotation != 0 and rotation != 360:
+                output = output.similarity (angle=rotation)
+
+            if quality == "gray":
+                output = output.colourspace (pyvips.enums.Interpretation.B_W)
+
+            # The commonly used mimetype for TIFF is image/tiff.
+            if image_format == "tif":
+                image_format = "tiff"
+
+            cache_key = self.db.cache.make_key ((f"{file_uuid}_{region}_{size}_"
+                                                 f"{mirror}_{rotation}_"
+                                                 f"{quality}_{image_format}"))
+            file_path = f"{self.db.iiif_cache_storage}/{cache_key}"
+            target = pyvips.Target.new_to_file (file_path)
+            output.write_to_target (target, f".{image_format}")
+            response = send_file (file_path, request.environ, f"image/{image_format}",
+                              as_attachment=False, download_name=None)
+            response.headers["Access-Control-Allow-Origin"] = "*"
+            return response
+        except FileNotFoundError:
+            self.log.error ("File download failed due to missing file: '%s'.", file_path)
         except pyvips.error.Error as error:
             if "is not a known file format" in str(error):
                 return self.error_400 (request,
@@ -9427,30 +9453,5 @@ class ApiServer:
             else:
                 self.log.error ("Pyvips reported: %s", error)
             return self.error_500 ()
-
-        output = output.crop (output_region["x"], output_region["y"],
-                              output_region["w"], output_region["h"])
-
-        if rotation != 0 and rotation != 360:
-            output = output.similarity (angle=rotation)
-
-        if quality == "gray":
-            output = output.colourspace (pyvips.enums.Interpretation.B_W)
-
-        # The commonly used mimetype for TIFF is image/tiff.
-        if image_format == "tif":
-            image_format = "tiff"
-
-        try:
-            cache_key = self.db.cache.make_key (f"{file_uuid}_{region}_{size}_{mirror}_{rotation}_{quality}_{image_format}")
-            file_path = f"{self.db.iiif_cache_storage}/{cache_key}"
-            target = pyvips.Target.new_to_file (file_path)
-            output.write_to_target (target, f".{image_format}")
-            response = send_file (file_path, request.environ, f"image/{image_format}",
-                              as_attachment=False, download_name=None)
-            response.headers["Access-Control-Allow-Origin"] = "*"
-            return response
-        except FileNotFoundError:
-            self.log.error ("File download failed due to missing file: '%s'.", file_path)
 
         return self.error_500 ()
