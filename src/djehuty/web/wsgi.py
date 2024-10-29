@@ -422,6 +422,7 @@ class ApiServer:
             ## INTERNATIONAL IMAGE INTEROPERABILITY FRAMEWORK
             ## ----------------------------------------------------------------
             R("/iiif/v3/<file_uuid>/<region>/<size>/<rotation>/<quality>.<image_format>", self.iiif_v3_image),
+            R("/iiif/v3/<file_uuid>",                                            self.iiif_v3_image_context_redirect),
             R("/iiif/v3/<file_uuid>/info.json",                                  self.iiif_v3_image_context),
         ])
 
@@ -9285,6 +9286,21 @@ class ApiServer:
     ## ------------------------------------------------------------------------
     ## IIIF
     ## ------------------------------------------------------------------------
+
+    def iiif_v3_image_context_redirect (self, request, file_uuid):
+        """Implements /iiif/v3/<uuid>."""
+
+        if not self.enable_iiif:
+            return self.error_404 (request)
+
+        if not validator.is_valid_uuid (file_uuid):
+            return self.error_400 (request, "Invalid file UUID.", "InvalidFileUUID")
+
+        metadata = self.db.dataset_files (file_uuid = file_uuid)
+        if not metadata:
+            return self.error_404 (request)
+
+        return redirect (f"{self.base_url}/iiif/v3/{file_uuid}/info.json", code=303)
 
     def iiif_v3_image_context (self, request, file_uuid):
         """Implements /iiif/v3/<uuid>/info.json."""
