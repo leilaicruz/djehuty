@@ -9308,16 +9308,22 @@ class ApiServer:
                 "id":        f"{self.base_url}/iiif/v3/{file_uuid}",
                 "type":      "ImageService3",
                 "protocol":  "http://iiif.io/api/image",
-                "level":     "level0",
+                "profile":   "level1",
                 "width":     image.width,
                 "height":    image.height,
                 "maxWidth":  image.width,                # Optional
                 "maxHeight": image.height,               # Optional
                 "maxArea":   image.width * image.height, # Optional
-                "sizes": [{ "width": 1024, "height": 1024 }]
+                "extraFormats": ["jpg", "png", "tif", "webp"],
+                "extraFeatures": ["cors", "mirroring", "regionByPx",
+                                  "regionSquare", "rotationArbitrary",
+                                  "rotationBy90s"]
+                "sizes": [{ "width": image.width, "height": image.height }]
             }
             del image
-            return self.response (json.dumps (output))
+            response = self.response (json.dumps (output))
+            response.headers["Access-Control-Allow-Origin"] = "*"
+            return response
         except IndexError:
             self.log.error ("Unable to read metadata.")
         except (KeyError, FileNotFoundError, UnidentifiedImageError) as error:
@@ -9343,7 +9349,7 @@ class ApiServer:
             "image_format": image_format
         }
         supported_qualities = ["color", "gray", "bitonal", "default"]
-        supported_formats   = ["jpg", "tif", "png", "gif", "jp2", "pdf", "webp"]
+        supported_formats   = ["jpg", "png", "tif", "webp"]
         quality = validator.options_value (parameters, "quality", supported_qualities,
                                            required=True, error_list=validation_errors)
 
