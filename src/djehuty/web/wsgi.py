@@ -9373,14 +9373,12 @@ class ApiServer:
                                                 required=True, error_list=validation_errors)
 
         metadata = self.db.dataset_files (file_uuid = file_uuid)
-        if metadata is None:
+        if not metadata:
             return self.error_404 (request)
 
         metadata = metadata[0]
         input_filename = self.__filesystem_location (metadata)
         original  = pyvips.Image.new_from_file (input_filename)
-        #original  = Image.open (metadata["filename"])
-        #extension = original.format.lower()
 
         # Region
         output_region = { "x": 0, "y": 0, "w": original.width, "h": original.height }
@@ -9416,12 +9414,16 @@ class ApiServer:
         # Size and rotation
         output_size = { "w": original.width, "h": original.height }
         mirror      = (isinstance (rotation, str) and rotation[0] == "!")
-        rotation    = int(rotation) if not mirror else int(rotation[1:])
-        if rotation < 0 or rotation > 360:
-            validation_errors.append ({
-                "field_name": "rotation",
-                "message": "Rotation must be a value between 0 and 360."
-            })
+        try:
+            rotation    = int(rotation) if not mirror else int(rotation[1:])
+            if rotation < 0 or rotation > 360:
+                validation_errors.append ({
+                    "field_name": "rotation",
+                    "message": "Rotation must be a value between 0 and 360."
+                })
+        except ValueError:
+            return self.error_400 (request, "Rotation must be an integer.",
+                                   "InvalidRotationValue")
 
         # Error reporting
         if validation_errors:
