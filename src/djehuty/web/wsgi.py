@@ -9391,7 +9391,7 @@ class ApiServer:
                 output_region = { "x": deconstructed[0], "y": deconstructed[1],
                                   "w": deconstructed[2], "h": deconstructed[3] }
 
-        # Size
+        # Size and rotation
         output_size = { "w": original.width, "h": original.height }
         mirror      = (isinstance (rotation, str) and rotation[0] == "!")
         rotation    = int(rotation) if not mirror else int(rotation[1:])
@@ -9401,14 +9401,26 @@ class ApiServer:
                 "message": "Rotation must be a value between 0 and 360."
             })
 
-        # ...
+        # Error reporting
         if validation_errors:
             return self.error_400_list (request, validation_errors)
 
         # Transform the input image to the output image
         # ---------------------------------------------------------------------
-        output = pyvips.Image.new_temp_file(format=f".{image_format}")
-        original.write(output)
+        output = None
+        try:
+            output = pyvips.Image.new_temp_file(format=f".{image_format}")
+            original.write(output)
+        except pyvips.error.Error as error:
+            if "is not a known file format" in str(error):
+                return self.error_400 (request,
+                                       (f"'{image_format}' is not a supported "
+                                        "image format. The following are "
+                                        f"supported: {supported_formats}."),
+                                       "InvalidImageFormat")
+            else:
+                self.log.error ("Pyvips reported: %s", error)
+            return self.error_500 ()
 
         output = output.crop (output_region["x"], output_region["y"],
                               output_region["w"], output_region["h"])
