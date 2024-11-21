@@ -3353,7 +3353,48 @@ class ApiServer:
         return self.error_405 (["GET", "POST"])
 
     def ui_home (self, request):
-        """Implements /portal."""
+        """Implements the `/portal` endpoint.
+
+    This function serves the home page for the portal, providing repository
+    statistics and a list of the latest datasets. It ensures the request
+    accepts HTML responses and renders the `portal.html` template with the
+    appropriate context.
+
+    Args:
+        request (HTTPRequest): The HTTP request object, containing request details.
+
+    Returns:
+        HTTPResponse: A rendered HTML page (`portal.html`) with the following context:
+            - `summary_data`: A dictionary containing formatted repository statistics
+              (e.g., number of datasets, authors, collections, files, and total bytes).
+            - `latest`: A list of the latest datasets, where each entry is a tuple
+              containing the dataset's URL, title, and publication date.
+            - `notice_message`: A custom notice message to display on the page.
+            - `show_portal_summary`: A boolean flag indicating whether to show the
+              portal summary section.
+            - `show_institutions`: A boolean flag indicating whether to show
+              institutions information.
+            - `show_science_categories`: A boolean flag indicating whether to display
+              scientific categories.
+            - `show_latest_datasets`: A boolean flag indicating whether to display the
+              latest datasets.
+
+        HTTPErrorResponse: A 406 error if the request does not accept HTML responses.
+
+    Raises:
+        None: All exceptions are handled within the function.
+
+    Workflow:
+        1. Validate that the request accepts HTML responses.
+        2. Fetch repository statistics from the database and format them.
+        3. Retrieve a list of the latest datasets for the portal.
+        4. Render the `portal.html` template with the fetched data and context.
+
+    Example:
+        >>> request = MockHTTPRequest(accepts_html=True)
+        >>> response = ui_home(self, request)
+        >>> print(response.status_code)
+        200"""
         if not self.accepts_html (request):
             return self.error_406 ("text/html")
 
