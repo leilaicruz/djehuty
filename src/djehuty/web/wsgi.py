@@ -1549,7 +1549,24 @@ class ApiServer:
     ## ------------------------------------------------------------------------
 
     def ui_redirect_to_home (self, request):
-        """Implements /."""
+        """
+    Redirects `/portal` and `/browse` to the home page.
+
+    This function handles redirection for legacy or alternative routes to the main
+    home page.
+
+    Args:
+        request (HTTPRequest): The incoming HTTP request object.
+
+    Returns:
+        HTTPResponse: A 301 redirect to `/`.
+        HTTPResponse: A JSON response indicating the status if HTML is not accepted.
+
+    Example:
+        >>> response = ui_redirect_to_home(self, request)
+        >>> print(response.status_code)
+        301
+    """
         if self.accepts_html (request, strict=True):
             return redirect ("/", code=301)
 
@@ -1601,7 +1618,23 @@ class ApiServer:
         return self.response (json.dumps({ "status": "maintenance" }))
 
     def ui_account_home (self, request):
-        """Implements /account/home."""
+        """Handles the `/account/home` endpoint.
+
+    This function redirects authenticated users to their dashboard or initiates
+    login with the configured identity provider.
+
+    Args:
+        request (HTTPRequest): The incoming HTTP request object.
+
+    Returns:
+        HTTPResponse: A redirect to `/my/dashboard` or the login page.
+        HTTPErrorResponse: A 403 error if authentication fails.
+
+    Example:
+        >>> response = ui_account_home(self, request)
+        >>> print(response.status_code)
+        302
+        """
         handler = self.default_error_handling (request, "GET", "text/html")
         if handler is not None:
             return handler
@@ -1697,7 +1730,22 @@ class ApiServer:
         return False
 
     def ui_login (self, request):
-        """Implements /login."""
+        """Implements the `/login` endpoint.
+
+    This function provides the user login interface, handling authentication via
+    various identity providers such as SAML or ORCID.
+
+    Args:
+        request (HTTPRequest): The incoming HTTP request object.
+
+    Returns:
+        HTTPResponse: A redirect to the appropriate login provider or an error page.
+
+    Example:
+        >>> response = ui_login(self, request)
+        >>> print(response.status_code)
+        302
+        """
 
         account_uuid = None
         account      = None
@@ -1879,7 +1927,21 @@ class ApiServer:
         return self.error_500 ()
 
     def ui_logout (self, request):
-        """Implements /logout."""
+        """Implements the `/logout` endpoint.
+
+    This function logs the user out and redirects them to the home page.
+
+    Args:
+        request (HTTPRequest): The incoming HTTP request object.
+
+    Returns:
+        HTTPResponse: A redirect to the home page after logout.
+
+    Example:
+        >>> response = ui_logout(self, request)
+        >>> print(response.status_code)
+        302
+        """
         if not self.accepts_html (request):
             return self.error_406 ("text/html")
 
@@ -1986,7 +2048,24 @@ class ApiServer:
         return response
 
     def ui_dashboard (self, request):
-        """Implements /my/dashboard."""
+        """Implements the `/my/dashboard` endpoint.
+
+    This function serves the user's dashboard, displaying an overview of their data,
+    activity, and available resources.
+
+    Args:
+        request (HTTPRequest): The incoming HTTP request object.
+
+    Returns:
+        HTTPResponse: A rendered HTML page displaying the user's dashboard.
+        HTTPErrorResponse: An error response if the user is not authorized or if
+        the request is invalid.
+
+    Example:
+        >>> response = ui_dashboard(self, request)
+        >>> print(response.status_code)
+        200
+        """
         if not self.accepts_html (request):
             return self.error_406 ("text/html")
 
@@ -2030,7 +2109,24 @@ class ApiServer:
         return datasets
 
     def ui_my_data (self, request):
-        """Implements /my/datasets."""
+        """Implements the `/my/datasets` endpoint.
+
+    This function displays a list of datasets owned or managed by the user,
+    providing tools to manage them.
+
+    Args:
+        request (HTTPRequest): The incoming HTTP request object.
+
+    Returns:
+        HTTPResponse: A rendered HTML page displaying the user's datasets.
+        HTTPErrorResponse: An error response if the request is invalid or
+        unauthorized.
+
+    Example:
+        >>> response = ui_my_data(self, request)
+        >>> print(response.status_code)
+        200
+        """
         if not self.accepts_html (request):
             return self.error_406 ("text/html")
 
@@ -2073,7 +2169,24 @@ class ApiServer:
                                        collection_id = collection_id)
 
     def ui_dataset_submitted (self, request):
-        """Implements /my/datasets/submitted-for-review."""
+        """ Implements the `/my/datasets/submitted-for-review` endpoint.
+
+    This function displays a list of datasets that the user has submitted for review,
+    along with their statuses.
+
+    Args:
+        request (HTTPRequest): The incoming HTTP request object.
+
+    Returns:
+        HTTPResponse: A rendered HTML page showing the submitted datasets.
+        HTTPErrorResponse: An error response if the request is unauthorized
+        or invalid.
+
+    Example:
+        >>> response = ui_dataset_submitted(self, request)
+        >>> print(response.status_code)
+        200
+        """
         if not self.accepts_html (request):
             return self.error_406 ("text/html")
 
@@ -2084,7 +2197,24 @@ class ApiServer:
         return self.__render_template (request, "depositor/submitted-for-review.html")
 
     def ui_new_dataset (self, request):
-        """Implements /my/datasets/new."""
+        """Implements the `/my/datasets/new` endpoint.
+
+    This function provides the interface for creating a new dataset,
+    allowing users to input metadata and upload files.
+
+    Args:
+        request (HTTPRequest): The incoming HTTP request object.
+
+    Returns:
+        HTTPResponse: A rendered HTML page for creating a new dataset.
+        HTTPErrorResponse: An error response if the request is unauthorized
+        or invalid.
+
+    Example:
+        >>> response = ui_new_dataset(self, request)
+        >>> print(response.status_code)
+        200
+        """
         if not self.accepts_html (request):
             return self.error_406 ("text/html")
 
@@ -2110,7 +2240,25 @@ class ApiServer:
         return self.error_500()
 
     def ui_new_version_draft_dataset (self, request, dataset_id):
-        """Implements /my/datasets/<id>/new-version-draft."""
+        """ Implements the `/my/datasets/<dataset_id>/new-version-draft` endpoint.
+
+    This function allows users to create a draft for a new version of an existing dataset.
+
+    Args:
+        request (HTTPRequest): The incoming HTTP request object.
+        dataset_id (str): The unique identifier of the dataset for which a new version draft is to be created.
+
+    Returns:
+        HTTPResponse: A rendered HTML page for the new version draft creation.
+        HTTPErrorResponse: An error response if the user lacks permissions
+        or the dataset does not exist.
+
+    Example:
+        >>> dataset_id = "12345"
+        >>> response = ui_new_version_draft_dataset(self, request, dataset_id)
+        >>> print(response.status_code)
+        200
+        """
         if not self.accepts_html (request):
             return self.error_406 ("text/html")
 
@@ -2144,7 +2292,26 @@ class ApiServer:
         return redirect (f"/my/datasets/{container_uuid}/edit", code=302)
 
     def ui_edit_dataset (self, request, dataset_id):
-        """Implements /my/datasets/<id>/edit."""
+        """Implements the `/my/datasets/<dataset_id>/edit` endpoint.
+
+    This function renders the dataset editing interface for a specific dataset
+    owned or managed by the user.
+
+    Args:
+        request (HTTPRequest): The incoming HTTP request object.
+        dataset_id (str): The unique identifier of the dataset to edit.
+
+    Returns:
+        HTTPResponse: A rendered HTML page for editing the dataset.
+        HTTPErrorResponse: An error response if the dataset is not found or
+        the user does not have permission.
+
+    Example:
+        >>> dataset_id = "12345"
+        >>> response = ui_edit_dataset(self, request, dataset_id)
+        >>> print(response.status_code)
+        200
+        """
         if not self.accepts_html (request):
             return self.error_406 ("text/html")
 
@@ -2202,7 +2369,26 @@ class ApiServer:
             return self.error_403 (request)
 
     def ui_delete_dataset (self, request, dataset_id):
-        """Implements /my/datasets/<id>/delete."""
+        """Implements the `/my/datasets/<dataset_id>/delete` endpoint.
+
+    This function handles the deletion of a dataset owned by the user,
+    ensuring necessary permissions and confirmations.
+
+    Args:
+        request (HTTPRequest): The incoming HTTP request object.
+        dataset_id (str): The unique identifier of the dataset to delete.
+
+    Returns:
+        HTTPResponse: A confirmation or success response after deletion.
+        HTTPErrorResponse: An error response if the user lacks permissions
+        or the dataset does not exist.
+
+    Example:
+        >>> dataset_id = "12345"
+        >>> response = ui_delete_dataset(self, request, dataset_id)
+        >>> print(response.status_code)
+        200
+        """
         if not self.accepts_html (request):
             return self.error_406 ("text/html")
 
@@ -2229,7 +2415,26 @@ class ApiServer:
         return self.error_500 ()
 
     def ui_dataset_private_links (self, request, dataset_uuid):
-        """Implements /my/datasets/<uuid>/private_links."""
+        """Implements the `/my/datasets/<dataset_uuid>/private_links` endpoint.
+
+    This function displays and manages private links for a specific dataset,
+    allowing users to share restricted access to the dataset.
+
+    Args:
+        request (HTTPRequest): The incoming HTTP request object.
+        dataset_uuid (str): The unique identifier (UUID) of the dataset.
+
+    Returns:
+        HTTPResponse: A rendered HTML page showing private link management options.
+        HTTPErrorResponse: An error response if the user lacks permission or
+        the dataset does not exist.
+
+    Example:
+        >>> dataset_uuid = "abcdef-12345"
+        >>> response = ui_dataset_private_links(self, request, dataset_uuid)
+        >>> print(response.status_code)
+        200
+        """
 
         account_uuid = self.default_authenticated_error_handling (request, "GET", "text/html")
         if isinstance (account_uuid, Response):
@@ -2742,7 +2947,26 @@ class ApiServer:
             return self.error_400(request, error.message, error.code)
 
     def ui_dataset_new_private_link (self, request, dataset_uuid):
-        """Implements /my/datasets/<uuid>/private_link/new."""
+        """Implements the `/my/datasets/<dataset_uuid>/private_link/new` endpoint.
+
+    This function allows users to create a new private link for sharing restricted access
+    to a dataset.
+
+    Args:
+        request (HTTPRequest): The incoming HTTP request object.
+        dataset_uuid (str): The unique UUID of the dataset.
+
+    Returns:
+        HTTPResponse: A success response after creating a new private link.
+        HTTPErrorResponse: An error response if the user lacks permissions
+        or the dataset does not exist.
+
+    Example:
+        >>> dataset_uuid = "abcdef-12345"
+        >>> response = ui_dataset_new_private_link(self, request, dataset_uuid)
+        >>> print(response.status_code)
+        200
+        """
         if not self.accepts_html (request):
             return self.error_406 ("text/html")
 
@@ -2842,7 +3066,27 @@ class ApiServer:
         return response
 
     def ui_dataset_delete_private_link (self, request, dataset_uuid, link_id):
-        """Implements /my/datasets/<uuid>/private_link/<pid>/delete."""
+        """Implements the `/my/datasets/<dataset_uuid>/private_link/<link_id>/delete` endpoint.
+
+    This function handles the deletion of a specific private link associated with a dataset.
+
+    Args:
+        request (HTTPRequest): The incoming HTTP request object.
+        dataset_uuid (str): The unique UUID of the dataset.
+        link_id (str): The unique identifier of the private link to delete.
+
+    Returns:
+        HTTPResponse: A success response after the private link is deleted.
+        HTTPErrorResponse: An error response if the private link does not exist
+        or the user lacks permissions.
+
+    Example:
+        >>> dataset_uuid = "abcdef-12345"
+        >>> link_id = "link-67890"
+        >>> response = ui_dataset_delete_private_link(self, request, dataset_uuid, link_id)
+        >>> print(response.status_code)
+        200
+        """
         if not self.accepts_html (request):
             return self.error_406 ("text/html")
 
@@ -3353,7 +3597,48 @@ class ApiServer:
         return self.error_405 (["GET", "POST"])
 
     def ui_home (self, request):
-        """Implements /portal."""
+        """Implements the `/portal` endpoint.
+
+    This function serves the home page for the portal, providing repository
+    statistics and a list of the latest datasets. It ensures the request
+    accepts HTML responses and renders the `portal.html` template with the
+    appropriate context.
+
+    Args:
+        request (HTTPRequest): The HTTP request object, containing request details.
+
+    Returns:
+        HTTPResponse: A rendered HTML page (`portal.html`) with the following context:
+            - `summary_data`: A dictionary containing formatted repository statistics
+              (e.g., number of datasets, authors, collections, files, and total bytes).
+            - `latest`: A list of the latest datasets, where each entry is a tuple
+              containing the dataset's URL, title, and publication date.
+            - `notice_message`: A custom notice message to display on the page.
+            - `show_portal_summary`: A boolean flag indicating whether to show the
+              portal summary section.
+            - `show_institutions`: A boolean flag indicating whether to show
+              institutions information.
+            - `show_science_categories`: A boolean flag indicating whether to display
+              scientific categories.
+            - `show_latest_datasets`: A boolean flag indicating whether to display the
+              latest datasets.
+
+        HTTPErrorResponse: A 406 error if the request does not accept HTML responses.
+
+    Raises:
+        None: All exceptions are handled within the function.
+
+    Workflow:
+        1. Validate that the request accepts HTML responses.
+        2. Fetch repository statistics from the database and format them.
+        3. Retrieve a list of the latest datasets for the portal.
+        4. Render the `portal.html` template with the fetched data and context.
+
+    Example:
+        >>> request = MockHTTPRequest(accepts_html=True)
+        >>> response = ui_home(self, request)
+        >>> print(response.status_code)
+        200"""
         if not self.accepts_html (request):
             return self.error_406 ("text/html")
 
@@ -3384,7 +3669,46 @@ class ApiServer:
                                        show_latest_datasets = self.show_latest_datasets)
 
     def ui_categories (self, request, category_id):
-        """Implements /categories/<id>."""
+        """    Implements the `/categories/<id>` endpoint.
+
+    This function serves a page displaying information about a specific category,
+    including its datasets, subcategories, and collections. It handles pagination
+    for datasets and ensures the request is valid and authorized.
+
+    Args:
+        request (HTTPRequest): The HTTP request object, containing request details.
+        category_id (int): The ID of the category to display.
+
+    Returns:
+        HTTPResponse: A rendered HTML page (`categories.html`) with the following context:
+            - `articles`: A list of datasets belonging to the specified category,
+              subject to pagination.
+            - `collections`: A list of collections associated with the category.
+            - `category`: The category details as retrieved from the database.
+            - `subcategories`: A list of subcategories under the specified category.
+
+        HTTPErrorResponse:
+            - 406 error if the request does not accept HTML responses.
+            - 404 error if the category is invalid or not found.
+
+    Raises:
+        None: All exceptions are handled and transformed into HTTP error responses.
+
+    Workflow:
+        1. Validate that the request accepts HTML responses.
+        2. Retrieve pagination parameters (`page` and `page_size`) from the request.
+           - Defaults: `page_size` = 100, `page` = 1.
+        3. Validate the pagination parameters and the `category_id`.
+        4. Fetch the category details from the database.
+        5. Retrieve datasets, subcategories, and collections associated with the category.
+        6. Render the `categories.html` template with the retrieved data.
+
+    Example:
+        >>> request = MockHTTPRequest(accepts_html=True, params={"page": 2, "page_size": 50})
+        >>> category_id = 42
+        >>> response = ui_categories(self, request, category_id)
+        >>> print(response.status_code)
+        200"""
         if not self.accepts_html (request):
             return self.error_406 ("text/html")
 
@@ -3832,7 +4156,40 @@ class ApiServer:
                                        sub_groups=sub_groups)
 
     def ui_category (self, request):
-        """Implements /category."""
+        """
+    Implements the `/category` endpoint.
+
+    This function serves a page displaying a list of root categories, each with a 
+    preview of associated datasets. It ensures the request is valid and authorized 
+    to render HTML content.
+
+    Args:
+        request (HTTPRequest): The HTTP request object, containing request details.
+
+    Returns:
+        HTTPResponse: A rendered HTML page (`category.html`) with the following context:
+            - `categories`: A list of root categories. Each category is enriched with
+              a preview of up to 5 associated datasets.
+
+        HTTPErrorResponse:
+            - 406 error if the request does not accept HTML responses.
+
+    Raises:
+        None: All exceptions are handled and transformed into HTTP error responses.
+
+    Workflow:
+        1. Validate that the request accepts HTML responses.
+        2. Retrieve the list of root categories from the database.
+        3. For each category, fetch up to 5 associated datasets and add them to the
+           category object under the `articles` key.
+        4. Render the `category.html` template with the retrieved data.
+
+    Example:
+        >>> request = MockHTTPRequest(accepts_html=True)
+        >>> response = ui_category(self, request)
+        >>> print(response.status_code)
+        200
+    """
         if not self.accepts_html (request):
             return self.error_406 ("text/html")
 
@@ -4157,15 +4514,88 @@ class ApiServer:
                                        page_title=f"{search_for} (search)")
 
     def api_authorize (self, request):
-        """Implements /v2/account/applications/authorize."""
+        """Implements the `/v2/account/applications/authorize` endpoint.
+
+    This function handles the authorization process for applications accessing
+    user accounts via the API. It validates client credentials and user permissions.
+
+    Args:
+        request (HTTPRequest): The incoming HTTP request object.
+
+    Returns:
+        HTTPResponse: A success response containing authorization details if the
+        client and user credentials are valid.
+        HTTPErrorResponse:
+            - `400` if the request is malformed.
+            - `401` if authentication fails.
+            - `403` if the user lacks permissions.
+
+    Workflow:
+        1. Validate the request parameters and client credentials.
+        2. Check user permissions and grant authorization.
+        3. Return an authorization response.
+
+    Example:
+        >>> response = api_authorize(self, request)
+        >>> print(response.status_code)
+        200
+        """
         return self.error_404 (request)
 
     def api_token (self, request):
-        """Implements /v2/token."""
+        """Implements the `/v2/token` endpoint.
+
+    This function generates or refreshes an API token for authenticated users
+    or applications. It supports token-based authentication workflows.
+
+    Args:
+        request (HTTPRequest): The incoming HTTP request object.
+
+    Returns:
+        HTTPResponse: A success response containing the generated or refreshed token.
+        HTTPErrorResponse:
+            - `400` if the request is malformed.
+            - `401` if authentication fails.
+            - `403` if the client lacks permissions.
+
+    Workflow:
+        1. Validate the request parameters (e.g., client credentials or refresh token).
+        2. Generate or refresh the token.
+        3. Return the token response.
+
+    Example:
+        >>> response = api_token(self, request)
+        >>> print(response.status_code)
+        200
+        """
         return self.error_404 (request)
 
     def api_private_institution (self, request):
-        """Implements /v2/account/institution."""
+        """Implements the `/v2/account/institution` endpoint.
+
+    This function retrieves information about the user's associated institution
+    within the private account context.
+
+    Args:
+        request (HTTPRequest): The incoming HTTP request object.
+
+    Returns:
+        HTTPResponse: A success response containing the user's institution details.
+        HTTPErrorResponse:
+            - `401` if authentication fails.
+            - `403` if the user lacks necessary permissions.
+            - `404` if the institution is not found.
+
+    Workflow:
+        1. Validate the user's authentication and permissions.
+        2. Retrieve the institution details associated with the user's account.
+        3. Return the institution details in the response.
+
+    Example:
+        >>> response = api_private_institution(self, request)
+        >>> print(response.status_code)
+        200
+        """
         account_uuid = self.default_authenticated_error_handling (request, "GET", "application/json")
         if isinstance (account_uuid, Response):
             return account_uuid
@@ -4174,7 +4604,31 @@ class ApiServer:
         return self.response (json.dumps({ "id": 898, "name": self.site_name }))
 
     def api_private_institution_accounts (self, request):
-        """Implements /v2/account/institution/accounts."""
+        """Implements the `/v2/account/institution/accounts` endpoint.
+
+    This function retrieves a list of accounts associated with the user's institution
+    within the private account context.
+
+    Args:
+        request (HTTPRequest): The incoming HTTP request object.
+
+    Returns:
+        HTTPResponse: A success response containing a list of accounts.
+        HTTPErrorResponse:
+            - `401` if authentication fails.
+            - `403` if the user lacks necessary permissions.
+            - `500` if there is an internal server error.
+
+    Workflow:
+        1. Validate the user's authentication and permissions.
+        2. Retrieve the list of accounts associated with the user's institution.
+        3. Return the account list in the response.
+
+    Example:
+        >>> response = api_private_institution_accounts(self, request)
+        >>> print(response.status_code)
+        200
+        """
 
         handler = self.default_authenticated_error_handling (request, "GET", "application/json",
                                                              self.db.may_administer)
@@ -4199,7 +4653,33 @@ class ApiServer:
         return self.default_list_response (accounts, formatter.format_account_record)
 
     def api_private_institution_account (self, request, account_uuid):
-        """Implements /v2/account/institution/users/<id>."""
+        """Implements the `/v2/account/institution/users/<account_uuid>` endpoint.
+
+    This function retrieves information about a specific user's association with
+    an institution based on their `account_uuid`.
+
+    Args:
+        request (HTTPRequest): The incoming HTTP request object.
+        account_uuid (str): The unique UUID of the account to retrieve.
+
+    Returns:
+        HTTPResponse: A success response containing the account's institution details.
+        HTTPErrorResponse:
+            - `401` if authentication fails.
+            - `403` if the user lacks necessary permissions.
+            - `404` if the account or institution is not found.
+
+    Workflow:
+        1. Validate the user's authentication and permissions.
+        2. Retrieve the account's institution association using `account_uuid`.
+        3. Return the institution details in the response.
+
+    Example:
+        >>> account_uuid = "user-12345"
+        >>> response = api_private_institution_account(self, request, account_uuid)
+        >>> print(response.status_code)
+        200
+        """
         account_uuid = self.default_authenticated_error_handling (request, "GET", "application/json")
         if isinstance (account_uuid, Response):
             return account_uuid
@@ -4210,7 +4690,29 @@ class ApiServer:
         return self.response (json.dumps (formatted))
 
     def api_datasets (self, request):
-        """Implements /v2/articles."""
+        """Implements the `/v2/articles` endpoint.
+
+    This function retrieves a list of publicly available datasets (articles), with optional filtering and pagination.
+
+    Args:
+        request (HTTPRequest): The incoming HTTP request object.
+
+    Returns:
+        HTTPResponse: A success response containing the list of datasets.
+        HTTPErrorResponse:
+            - `400` if the request is malformed.
+            - `500` if there is an internal server error.
+
+    Workflow:
+        1. Parse optional query parameters for filtering and pagination.
+        2. Retrieve the list of datasets from the database.
+        3. Return the dataset list in the response.
+
+    Example:
+        >>> response = api_datasets(self, request)
+        >>> print(response.status_code)
+        200
+        """
         handler = self.default_error_handling (request, "GET", "application/json")
         if handler is not None:
             return handler
@@ -4226,7 +4728,30 @@ class ApiServer:
             return self.error_400 (request, error.message, error.code)
 
     def api_datasets_search (self, request):
-        """Implements /v2/articles/search."""
+
+        """Implements the `/v2/articles/search` endpoint.
+
+    This function performs a search for datasets based on user-specified criteria.
+
+    Args:
+        request (HTTPRequest): The incoming HTTP request object.
+
+    Returns:
+        HTTPResponse: A success response containing the search results.
+        HTTPErrorResponse:
+            - `400` if the request is malformed.
+            - `500` if there is an internal server error.
+
+    Workflow:
+        1. Parse search parameters from the request.
+        2. Execute the search query on the database.
+        3. Return the search results in the response.
+
+    Example:
+        >>> response = api_datasets_search(self, request)
+        >>> print(response.status_code)
+        200
+        """
 
         if request.method == "OPTIONS":
             response = self.respond_204 ()
@@ -4282,7 +4807,31 @@ class ApiServer:
         return self.response (json.dumps(formatter.format_account_record (account)))
 
     def api_dataset_details (self, request, dataset_id):
-        """Implements /v2/articles/<id>."""
+        """Implements the `/v2/articles/<dataset_id>` endpoint.
+
+    This function retrieves detailed information about a specific dataset.
+
+    Args:
+        request (HTTPRequest): The incoming HTTP request object.
+        dataset_id (str): The unique identifier of the dataset.
+
+    Returns:
+        HTTPResponse: A success response containing the dataset details.
+        HTTPErrorResponse:
+            - `404` if the dataset is not found.
+            - `500` if there is an internal server error.
+
+    Workflow:
+        1. Validate the `dataset_id`.
+        2. Retrieve the dataset details from the database.
+        3. Return the dataset details in the response.
+
+    Example:
+        >>> dataset_id = "article-12345"
+        >>> response = api_dataset_details(self, request, dataset_id)
+        >>> print(response.status_code)
+        200
+        """
         handler = self.default_error_handling (request, "GET", "application/json")
         if handler is not None:
             return handler
@@ -4320,7 +4869,31 @@ class ApiServer:
             return self.error_404 (request)
 
     def api_dataset_versions (self, request, dataset_id):
-        """Implements /v2/articles/<id>/versions."""
+        """Implements the `/v2/articles/<dataset_id>/versions` endpoint.
+
+    This function retrieves a list of versions for a specific dataset.
+
+    Args:
+        request (HTTPRequest): The incoming HTTP request object.
+        dataset_id (str): The unique identifier of the dataset.
+
+    Returns:
+        HTTPResponse: A success response containing the list of dataset versions.
+        HTTPErrorResponse:
+            - `404` if the dataset is not found.
+            - `500` if there is an internal server error.
+
+    Workflow:
+        1. Validate the `dataset_id`.
+        2. Retrieve the list of versions from the database.
+        3. Return the version list in the response.
+
+    Example:
+        >>> dataset_id = "article-12345"
+        >>> response = api_dataset_versions(self, request, dataset_id)
+        >>> print(response.status_code)
+        200
+        """
         handler = self.default_error_handling (request, "GET", "application/json")
         if handler is not None:
             return handler
@@ -4334,7 +4907,33 @@ class ApiServer:
                                            base_url = self.base_url)
 
     def api_dataset_version_details (self, request, dataset_id, version):
-        """Implements /v2/articles/<id>/versions/<version>."""
+        """Implements the `/v2/articles/<dataset_id>/versions/<version>` endpoint.
+
+    This function retrieves detailed information about a specific version of a dataset.
+
+    Args:
+        request (HTTPRequest): The incoming HTTP request object.
+        dataset_id (str): The unique identifier of the dataset.
+        version (str): The version identifier of the dataset.
+
+    Returns:
+        HTTPResponse: A success response containing the details of the dataset version.
+        HTTPErrorResponse:
+            - `404` if the dataset version is not found.
+            - `500` if there is an internal server error.
+
+    Workflow:
+        1. Validate the `dataset_id` and `version`.
+        2. Retrieve the dataset version details from the database.
+        3. Return the version details in the response.
+
+    Example:
+        >>> dataset_id = "article-12345"
+        >>> version = "v1.0"
+        >>> response = api_dataset_version_details(self, request, dataset_id, version)
+        >>> print(response.status_code)
+        200
+        """
         handler = self.default_error_handling (request, "GET", "application/json")
         if handler is not None:
             return handler
@@ -4367,7 +4966,35 @@ class ApiServer:
         return self.response (json.dumps(total))
 
     def api_dataset_version_embargo (self, request, dataset_id, version):
-        """Implements /v2/articles/<id>/versions/<version>/embargo."""
+        """Implements the `/v2/articles/<dataset_id>/versions/<version>/embargo` endpoint.
+
+    This function retrieves or updates the embargo status of a specific dataset version.
+
+    Args:
+        request (HTTPRequest): The incoming HTTP request object.
+        dataset_id (str): The unique identifier of the dataset.
+        version (str): The version identifier of the dataset.
+
+    Returns:
+        HTTPResponse: A success response containing the embargo details or a confirmation of the update.
+        HTTPErrorResponse:
+            - `400` if the request is malformed.
+            - `404` if the dataset version is not found.
+            - `500` if there is an internal server error.
+
+    Workflow:
+        1. Validate the `dataset_id` and `version`.
+        2. If the request is a GET, retrieve the embargo status from the database.
+        3. If the request is a PUT, update the embargo status.
+        4. Return the embargo details or confirmation response.
+
+    Example:
+        >>> dataset_id = "article-12345"
+        >>> version = "v1.0"
+        >>> response = api_dataset_version_embargo(self, request, dataset_id, version)
+        >>> print(response.status_code)
+        200
+        """
         handler = self.default_error_handling (request, "GET", "application/json")
         if handler is not None:
             return handler
@@ -4382,7 +5009,35 @@ class ApiServer:
         return self.response (json.dumps(total))
 
     def api_dataset_version_confidentiality (self, request, dataset_id, version):
-        """Implements /v2/articles/<id>/versions/<version>/confidentiality."""
+        """Implements the `/v2/articles/<dataset_id>/versions/<version>/confidentiality` endpoint.
+
+    This function retrieves or updates the confidentiality status of a specific dataset version.
+
+    Args:
+        request (HTTPRequest): The incoming HTTP request object.
+        dataset_id (str): The unique identifier of the dataset.
+        version (str): The version identifier of the dataset.
+
+    Returns:
+        HTTPResponse: A success response containing the confidentiality details or a confirmation of the update.
+        HTTPErrorResponse:
+            - `400` if the request is malformed.
+            - `404` if the dataset version is not found.
+            - `500` if there is an internal server error.
+
+    Workflow:
+        1. Validate the `dataset_id` and `version`.
+        2. If the request is a GET, retrieve the confidentiality status from the database.
+        3. If the request is a PUT, update the confidentiality status.
+        4. Return the confidentiality details or confirmation response.
+
+    Example:
+        >>> dataset_id = "article-12345"
+        >>> version = "v1.0"
+        >>> response = api_dataset_version_confidentiality(self, request, dataset_id, version)
+        >>> print(response.status_code)
+        200
+        """
         handler = self.default_error_handling (request, "GET", "application/json")
         if handler is not None:
             return handler
@@ -4397,7 +5052,35 @@ class ApiServer:
         return self.response (json.dumps(total))
 
     def api_dataset_version_update_thumb (self, request, dataset_id, version):
-        """Implements /v2/articles/<id>/versions/<version>/update_thumb."""
+        """Implements the `/v2/articles/<dataset_id>/versions/<version>/update_thumb` endpoint.
+
+    This function updates the thumbnail image associated with a specific dataset version.
+
+    Args:
+        request (HTTPRequest): The incoming HTTP request object.
+        dataset_id (str): The unique identifier of the dataset.
+        version (str): The version identifier of the dataset.
+
+    Returns:
+        HTTPResponse: A success response confirming the thumbnail update.
+        HTTPErrorResponse:
+            - `400` if the request is malformed.
+            - `404` if the dataset version is not found.
+            - `500` if there is an internal server error.
+
+    Workflow:
+        1. Validate the `dataset_id` and `version`.
+        2. Validate the new thumbnail data in the request body.
+        3. Update the thumbnail in the database.
+        4. Return a confirmation response.
+
+    Example:
+        >>> dataset_id = "article-12345"
+        >>> version = "v1.0"
+        >>> response = api_dataset_version_update_thumb(self, request, dataset_id, version)
+        >>> print(response.status_code)
+        200
+        """
         account_uuid = self.default_authenticated_error_handling (request, "PUT", "application/json")
         if isinstance (account_uuid, Response):
             return account_uuid
@@ -4429,7 +5112,31 @@ class ApiServer:
         return self.respond_205()
 
     def api_dataset_files (self, request, dataset_id):
-        """Implements /v2/articles/<id>/files."""
+        """Implements the `/v2/articles/<dataset_id>/files` endpoint.
+
+    This function retrieves a list of files associated with a specific dataset.
+
+    Args:
+        request (HTTPRequest): The incoming HTTP request object.
+        dataset_id (str): The unique identifier of the dataset.
+
+    Returns:
+        HTTPResponse: A success response containing the list of files.
+        HTTPErrorResponse:
+            - `404` if the dataset is not found.
+            - `500` if there is an internal server error.
+
+    Workflow:
+        1. Validate the `dataset_id`.
+        2. Retrieve the list of files associated with the dataset.
+        3. Return the file list in the response.
+
+    Example:
+        >>> dataset_id = "article-12345"
+        >>> response = api_dataset_files(self, request, dataset_id)
+        >>> print(response.status_code)
+        200
+        """
         handler = self.default_error_handling (request, "GET", "application/json")
         if handler is not None:
             return handler
@@ -4448,7 +5155,33 @@ class ApiServer:
                                            base_url = self.base_url)
 
     def api_dataset_file_details (self, request, dataset_id, file_id):
-        """Implements /v2/articles/<id>/files/<fid>."""
+        """Implements the `/v2/articles/<dataset_id>/files/<file_id>` endpoint.
+
+    This function retrieves detailed information about a specific file associated with a dataset.
+
+    Args:
+        request (HTTPRequest): The incoming HTTP request object.
+        dataset_id (str): The unique identifier of the dataset.
+        file_id (str): The unique identifier of the file.
+
+    Returns:
+        HTTPResponse: A success response containing the file details.
+        HTTPErrorResponse:
+            - `404` if the dataset or file is not found.
+            - `500` if there is an internal server error.
+
+    Workflow:
+        1. Validate the `dataset_id` and `file_id`.
+        2. Retrieve the file details from the database.
+        3. Return the file details in the response.
+
+    Example:
+        >>> dataset_id = "article-12345"
+        >>> file_id = "file-67890"
+        >>> response = api_dataset_file_details(self, request, dataset_id, file_id)
+        >>> print(response.status_code)
+        200
+        """
         handler = self.default_error_handling (request, "GET", "application/json")
         if handler is not None:
             return handler
@@ -5808,7 +6541,31 @@ class ApiServer:
     ## ------------------------------------------------------------------------
 
     def api_collections (self, request):
-        """Implements /v2/collections."""
+        """Implements the `/v2/collections` endpoint.
+
+    This function retrieves a list of collections available to the authenticated
+    user or application. Collections represent grouped datasets or resources.
+
+    Args:
+        request (HTTPRequest): The incoming HTTP request object.
+
+    Returns:
+        HTTPResponse: A success response containing the list of collections.
+        HTTPErrorResponse:
+            - `401` if authentication fails.
+            - `403` if the client lacks permissions.
+            - `500` if there is an internal server error.
+
+    Workflow:
+        1. Validate the user's authentication and permissions.
+        2. Query the database for collections accessible to the user.
+        3. Return the collections in the response.
+
+    Example:
+        >>> response = api_collections(self, request)
+        >>> print(response.status_code)
+        200
+        """
         handler = self.default_error_handling (request, "GET", "application/json")
         if handler is not None:
             return handler
@@ -5851,7 +6608,29 @@ class ApiServer:
             return self.error_400 (request, error.message, error.code)
 
     def api_collections_search (self, request):
-        """Implements /v2/collections/search."""
+        """Implements the `/v2/collections/search` endpoint.
+
+    This function performs a search for public collections based on user-specified criteria.
+
+    Args:
+        request (HTTPRequest): The incoming HTTP request object.
+
+    Returns:
+        HTTPResponse: A success response containing the search results.
+        HTTPErrorResponse:
+            - `400` if the request is malformed.
+            - `500` if there is an internal server error.
+
+    Workflow:
+        1. Parse search parameters from the request.
+        2. Execute the search query on the database.
+        3. Return the search results in the response.
+
+    Example:
+        >>> response = api_collections_search(self, request)
+        >>> print(response.status_code)
+        200
+        """
         handler = self.default_error_handling (request, "POST", "application/json")
         if handler is not None:
             return handler
@@ -5876,7 +6655,31 @@ class ApiServer:
                                            base_url = self.base_url)
 
     def api_collection_details (self, request, collection_id):
-        """Implements /v2/collections/<id>."""
+        """Implements the `/v2/collections/<collection_id>` endpoint.
+
+    This function retrieves detailed information about a specific public collection.
+
+    Args:
+        request (HTTPRequest): The incoming HTTP request object.
+        collection_id (str): The unique identifier of the collection.
+
+    Returns:
+        HTTPResponse: A success response containing the collection details.
+        HTTPErrorResponse:
+            - `404` if the collection is not found.
+            - `500` if there is an internal server error.
+
+    Workflow:
+        1. Validate the `collection_id`.
+        2. Retrieve the collection details from the database.
+        3. Return the collection details in the response.
+
+    Example:
+        >>> collection_id = "collection-12345"
+        >>> response = api_collection_details(self, request, collection_id)
+        >>> print(response.status_code)
+        200
+        """
         handler = self.default_error_handling (request, "GET", "application/json")
         if handler is not None:
             return handler
@@ -5892,7 +6695,31 @@ class ApiServer:
         return self.response (json.dumps(total))
 
     def api_collection_versions (self, request, collection_id):
-        """Implements /v2/collections/<id>/versions."""
+        """Implements the `/v2/collections/<collection_id>/versions` endpoint.
+
+    This function retrieves a list of versions for a specific collection.
+
+    Args:
+        request (HTTPRequest): The incoming HTTP request object.
+        collection_id (str): The unique identifier of the collection.
+
+    Returns:
+        HTTPResponse: A success response containing the list of collection versions.
+        HTTPErrorResponse:
+            - `404` if the collection is not found.
+            - `500` if there is an internal server error.
+
+    Workflow:
+        1. Validate the `collection_id`.
+        2. Retrieve the list of versions for the collection from the database.
+        3. Return the version list in the response.
+
+    Example:
+        >>> collection_id = "collection-12345"
+        >>> response = api_collection_versions(self, request, collection_id)
+        >>> print(response.status_code)
+        200
+        """
         handler = self.default_error_handling (request, "GET", "application/json")
         if handler is not None:
             return handler
@@ -5908,7 +6735,33 @@ class ApiServer:
                                            base_url = self.base_url)
 
     def api_collection_version_details (self, request, collection_id, version):
-        """Implements /v2/collections/<id>/versions/<version>."""
+        """mplements the `/v2/collections/<collection_id>/versions/<version>` endpoint.
+
+    This function retrieves detailed information about a specific version of a public collection.
+
+    Args:
+        request (HTTPRequest): The incoming HTTP request object.
+        collection_id (str): The unique identifier of the collection.
+        version (str): The version identifier of the collection.
+
+    Returns:
+        HTTPResponse: A success response containing the version details of the collection.
+        HTTPErrorResponse:
+            - `404` if the collection version is not found.
+            - `500` if there is an internal server error.
+
+    Workflow:
+        1. Validate the `collection_id` and `version`.
+        2. Retrieve the collection version details from the database.
+        3. Return the version details in the response.
+
+    Example:
+        >>> collection_id = "collection-12345"
+        >>> version = "v1.0"
+        >>> response = api_collection_version_details(self, request, collection_id, version)
+        >>> print(response.status_code)
+        200
+        """
         handler = self.default_error_handling (request, "GET", "application/json")
         if handler is not None:
             return handler
@@ -6342,7 +7195,31 @@ class ApiServer:
         return self.error_500 ()
 
     def api_collection_datasets (self, request, collection_id):
-        """Implements /v2/collections/<id>/articles."""
+        """Implements the `/v2/collections/<collection_id>/articles` endpoint.
+
+    This function retrieves a list of datasets (articles) associated with a specific public collection.
+
+    Args:
+        request (HTTPRequest): The incoming HTTP request object.
+        collection_id (str): The unique identifier of the collection.
+
+    Returns:
+        HTTPResponse: A success response containing the list of datasets.
+        HTTPErrorResponse:
+            - `404` if the collection is not found.
+            - `500` if there is an internal server error.
+
+    Workflow:
+        1. Validate the `collection_id`.
+        2. Retrieve the list of datasets associated with the collection.
+        3. Return the dataset list in the response.
+
+    Example:
+        >>> collection_id = "collection-12345"
+        >>> response = api_collection_datasets(self, request, collection_id)
+        >>> print(response.status_code)
+        200
+        """
         handler = self.default_error_handling (request, "GET", "application/json")
         if handler is not None:
             return handler
