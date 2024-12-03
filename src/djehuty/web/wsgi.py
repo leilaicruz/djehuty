@@ -1357,7 +1357,7 @@ class ApiServer:
     def saml_metadata (self, request):
         """Communicates the service provider metadata for SAML 2.0."""
 
-        if not (self.accepts_content_type (request, "application/samlmetadata+xml") or
+        if not (self.accepts_content_type (request, "application/samlmetadata+xml", strict=False) or
                 self.accepts_xml (request)):
             return self.error_406 ("text/xml")
 
@@ -4728,6 +4728,7 @@ class ApiServer:
             return self.error_400 (request, error.message, error.code)
 
     def api_datasets_search (self, request):
+
         """Implements the `/v2/articles/search` endpoint.
 
     This function performs a search for datasets based on user-specified criteria.
@@ -4751,6 +4752,15 @@ class ApiServer:
         >>> print(response.status_code)
         200
         """
+
+        if request.method == "OPTIONS":
+            response = self.respond_204 ()
+            response.headers["Accept"] = "application/json"
+            response.headers["Access-Control-Allow-Origin"] = "*"
+            response.headers["Access-Control-Allow-Headers"] = "Content-Type"
+            response.headers["Access-Control-Request-Methods"] = "POST"
+            return response
+
         handler = self.default_error_handling (request, "POST", "application/json")
         if handler is not None:
             return handler
@@ -8091,6 +8101,8 @@ class ApiServer:
         validator.string_value  (collection, "time_coverage",  0, 512,   False, errors)
         validator.string_value  (collection, "publisher",      0, 10000, True, errors)
         validator.string_value  (collection, "language",       0, 10,    True, errors)
+        validator.string_value  (collection, "resource_doi",   0, 255,   False, errors)
+        validator.string_value  (collection, "resource_title", 0, 255,   False, errors)
 
         authors = self.db.authors (item_uri  = collection["uri"],
                                    item_type = "collection")
@@ -8115,9 +8127,6 @@ class ApiServer:
             errors.append({
                 "field_name": "categories",
                 "message": "Please specify at least one category."})
-
-        resource_doi =   validator.string_value  (collection, "resource_doi",   0, 255,   False, errors)
-        resource_title = validator.string_value  (collection, "resource_title", 0, 255,   False, errors)
 
         if errors:
             return self.error_400_list (request, errors)
